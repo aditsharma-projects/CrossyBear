@@ -22,6 +22,113 @@ class Player extends Shape {
     }
 }
 
+class Car {
+    constructor(base_scene, z) {
+        this.car_width = 3;
+        this.model_transform = Mat4.identity().times(Mat4.translation(30, 0, z))
+            .times(Mat4.scale(this.car_width, 1.5, 1));
+        this.dx = 0.05;
+        this.x = 30;
+        this.base_scene = base_scene;
+    }
+
+    move(t) {
+        this.x -= this.dx;
+        this.model_transform = this.model_transform.times(Mat4.translation(-this.dx, 0, 0));
+    }
+
+    render(context, program_state, t) {
+        const car_color = hex_color("#bd112b");
+        this.move(t);
+        this.base_scene.shapes.cube.draw(context, program_state, this.model_transform, this.base_scene.materials.plastic.override({color: car_color}));
+    }
+}
+
+class RoadLane {
+    constructor(base_scene, i) {
+        this.base_scene = base_scene;
+        this.road_width = 2;
+        this.z = - (i*this.road_width);
+        this.model_transform = Mat4.identity().times(Mat4.translation(-40, -1.5, this.z))
+            .times(Mat4.scale(70, 0.01, this.road_width));
+        this.cars = [];
+    }
+
+    addCar() {
+        if (Math.random() < 0.001) {
+            //Add new car if there are no more than 3 cars on the road lane
+            //and there is no car immediately in front of new car
+            if (this.cars.length > 0) {
+                if (this.cars.length < 4 && this.cars.at(this.cars.length-1).x < 20) {
+                    let car_position = this.z - ((this.road_width - 1)/2);
+                    this.cars.push(new Car(this.base_scene, car_position));
+                }
+            } else {
+                let car_position = this.z - ((this.road_width - 1)/2);
+                this.cars.push(new Car(this.base_scene, car_position));
+            }
+        }
+    }
+
+    render_cars(context, program_state, t) {
+        this.addCar();
+
+        //Render cars
+        for (let i = 0; i < this.cars.length; i++) {
+            let car = this.cars.at(i);
+            car.render(context, program_state, t);
+            if (car.x < -40) this.cars.splice(i, 1);
+        }
+    }
+
+    render(context, program_state, t) {
+        const road_color = hex_color("#4d4d4d");
+
+        //Draw road lane
+        this.base_scene.shapes.cube.draw(context, program_state, this.model_transform, this.base_scene.materials.plastic.override({color: road_color}));
+
+        //Draw cars
+        this.render_cars(context, program_state, t);
+    }
+}
+
+class Road {
+    constructor(base_scene) {
+        this.base_scene = base_scene;
+        this.lanes = [];
+        //Generate random number of lanes per road: min 3, max 6
+        //this.numLanes = 3 + Math.floor(Math.random() * 3);
+
+        //For testing, fixed number of lanes
+        this.numLanes = 5;
+
+        for (let i = 0; i < this.numLanes; i++) {
+            this.lanes.push(new RoadLane(base_scene, i));
+        }
+    }
+
+    //Untested idea for jumping forward action
+    jump_forward(jump_distance) {
+        for (let i = 0; i < this.numLanes; i++) {
+            let lane = this.lanes.at(i);
+            lane.model_transform = lane.model_transform.times(Mat4.translation(0, 0, jump_distance));
+            for (let j = 0; j < lane.cars.length; j++) {
+                let car = lane.cars.at(j);
+                car.model_transform = car.model_transform.times(Mat4.translation(0, 0, jump_distance));
+            }
+        }
+    }
+
+    render(context, program_state, t) {
+        for (let i = 0; i < this.lanes.length; i++) {
+            let lane = this.lanes.at(i);
+            lane.render(context, program_state, t);
+        }
+    }
+
+
+}
+
 
 class Base_Scene extends Scene {
     /**
@@ -34,7 +141,9 @@ class Base_Scene extends Scene {
         this.hover = this.swarm = false;
         // At the beginning of our program, load one of each of these shape definitions onto the GPU.
         this.shapes = {
-            'player': new Player()
+            'player': new Player(),
+            cube: new defs.Cube(),
+            sphere: new defs.Subdivision_Sphere(4),
         };
 
         // *** Materials
@@ -77,6 +186,7 @@ export class Game extends Base_Scene {
         this.queuedMoves = 0;
         this.dir = 0;
         this.tStart = -1;
+        this.road = new Road(this);
     }
     set_view() {
         
@@ -160,5 +270,7 @@ export class Game extends Base_Scene {
         const t = program_state.animation_time/1000; // t is in seconds
         let model_transform = Mat4.identity();
         this.render_player(context, program_state, model_transform, t);
+        this.road.render(context, program_state, t);
+
     }
 }
