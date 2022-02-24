@@ -22,6 +22,52 @@ class Player extends Shape {
     }
 }
 
+class GrassLane {
+    constructor(game, i) {
+        this.game = game;
+        this.lane_width = 2;
+        this.lane_length = 70;
+
+        //To be changed after midway demo
+        this.z = 4 + i*this.lane_width;
+        this.model_transform = Mat4.identity().times(Mat4.translation(0, -1.5, this.z));
+
+        this.grass_color = hex_color("#5db025");
+    }
+
+    scale() {
+        this.scaled_model_transform = this.model_transform.times(Mat4.scale(this.lane_length, 0.01, this.lane_width));
+    }
+
+    render(context, program_state, t) {
+        this.scale();
+        this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: this.grass_color}));
+    }
+}
+
+class Grass {
+    constructor(game) {
+        this.game = game;
+        this.lanes = [];
+        //Generate random number of lanes per grass: min 2, max 8
+        //this.numLanes = 2 + Math.floor(Math.random() * 6);
+
+        //For testing, fixed number of lanes
+        this.numLanes = 5;
+
+        for (let i = 0; i < this.numLanes; i++) {
+            this.lanes.push(new GrassLane(game, i));
+        }
+    }
+
+    render(context, program_state, t) {
+        for (let i = 0; i < this.lanes.length; i++) {
+            let lane = this.lanes.at(i);
+            lane.render(context, program_state, t);
+        }
+    }
+}
+
 class Log {
     constructor(base_scene, x, z) {
         this.base_scene = base_scene;
@@ -53,7 +99,7 @@ class Water {
     constructor(base_scene) {
         this.base_scene = base_scene;
         this.river_width = 5;
-        this.model_tranform = Mat4.identity().times(Mat4.translation(-40, -1.5, -14.7))
+        this.model_tranform = Mat4.identity().times(Mat4.translation(0, -1.5, -14.7))
             .times(Mat4.scale(70, 1, this.river_width))
             .times(Mat4.rotation(1.5, 1, 0, 0));
     }
@@ -345,6 +391,7 @@ export class Game extends Base_Scene {
         this.dir = 0;
         this.tStart = -1;
         this.road = new Road(this);
+        this.grass = new Grass(this);
         this.water = new Water(this);
         this.log1 = new Log(this, 15, 2);
         this.log2 = new Log(this, 13, 0);
@@ -438,6 +485,7 @@ export class Game extends Base_Scene {
         let model_transform = Mat4.identity();
         this.render_player(context, program_state, model_transform, t);
         this.road.render(context, program_state, t);
+        this.grass.render(context, program_state, t);
         this.water.render(context, program_state);
         this.log1.render(context, program_state, t);
         this.log2.render(context, program_state, t);
