@@ -69,35 +69,82 @@ class Water {
 }
 
 class Car {
-    constructor(base_scene, z) {
-        this.car_width = 3;
-        this.model_transform = Mat4.identity().times(Mat4.translation(30, 0, z))
-            .times(Mat4.scale(this.car_width, 1.5, 1));
-        this.dx = 0.05;
-        this.x = 30;
-        this.base_scene = base_scene;
+    constructor(game, z, direction) {
+        this.car_length = 3;
+        this.direction = direction;
+        if (this.direction == 1) {
+            this.model_transform = Mat4.identity().times(Mat4.translation(-40, 1, z));
+            this.x = -40;
+        } else {
+            this.model_transform = Mat4.identity().times(Mat4.translation(30, 1, z));
+            this.x = 30;
+        }
+        this.model_transform_w1 = this.model_transform.times(Mat4.translation(-1.5, -1.5, 1));
+        this.model_transform_w2 = this.model_transform_w1.times(Mat4.translation(3, 0, 0));
+        this.model_transform_w3 = this.model_transform_w1.times(Mat4.translation(0, 0, -2));
+        this.model_transform_w4 = this.model_transform_w2.times(Mat4.translation(0, 0, -2));
+        this.scale();
+        this.dx = 0.1;
+        this.game = game;
     }
 
     move(t) {
-        this.x -= this.dx;
-        this.model_transform = this.model_transform.times(Mat4.translation(-this.dx, 0, 0));
+        if (this.direction == 1) {
+            this.x += this.dx;
+            this.model_transform = this.model_transform.times(Mat4.translation(this.dx, 0, 0));
+            this.model_transform_w1 = this.model_transform_w1.times(Mat4.translation(this.dx, 0, 0));
+            this.model_transform_w2 = this.model_transform_w2.times(Mat4.translation(this.dx, 0, 0));
+            this.model_transform_w3 = this.model_transform_w3.times(Mat4.translation(this.dx, 0, 0));
+            this.model_transform_w4 = this.model_transform_w4.times(Mat4.translation(this.dx, 0, 0));
+        } else {
+            this.x -= this.dx;
+            this.model_transform = this.model_transform.times(Mat4.translation(-this.dx, 0, 0));
+            this.model_transform_w1 = this.model_transform_w1.times(Mat4.translation(-this.dx, 0, 0));
+            this.model_transform_w2 = this.model_transform_w2.times(Mat4.translation(-this.dx, 0, 0));
+            this.model_transform_w3 = this.model_transform_w3.times(Mat4.translation(-this.dx, 0, 0));
+            this.model_transform_w4 = this.model_transform_w4.times(Mat4.translation(-this.dx, 0, 0));
+        }
     }
+
+    shift_forward(z) {
+        this.model_transform = this.model_transform.times(Mat4.translation(0, 0, z));
+        this.model_transform_w1 = this.model_transform_w1.times(Mat4.translation(0, 0, z));
+        this.model_transform_w2 = this.model_transform_w2.times(Mat4.translation(0, 0, z));
+        this.model_transform_w3 = this.model_transform_w3.times(Mat4.translation(0, 0, z));
+        this.model_transform_w4 = this.model_transform_w4.times(Mat4.translation(0, 0, z));
+    }
+
+    scale() {
+        this.scaled_model_transform = this.model_transform.times(Mat4.scale(this.car_length, 1.5, 1));
+        this.scaled_model_transform_w1 = this.model_transform_w1.times(Mat4.scale(1, 1, 0.5));
+        this.scaled_model_transform_w2 = this.model_transform_w2.times(Mat4.scale(1, 1, 0.5));
+        this.scaled_model_transform_w3 = this.model_transform_w3.times(Mat4.scale(1, 1, 0.5));
+        this.scaled_model_transform_w4 = this.model_transform_w4.times(Mat4.scale(1, 1, 0.5));
+    }
+
 
     render(context, program_state, t) {
         const car_color = hex_color("#bd112b");
-        this.move(t);
-        this.base_scene.shapes.cube.draw(context, program_state, this.model_transform, this.base_scene.materials.plastic.override({color: car_color}));
+        const wheel_color = hex_color("#000000");
+        this.move(t)
+        this.scale();
+        this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: car_color}));
+        this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w1, this.game.materials.plastic.override({color: wheel_color}));
+        this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w2, this.game.materials.plastic.override({color: wheel_color}));
+        this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w3, this.game.materials.plastic.override({color: wheel_color}));
+        this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w4, this.game.materials.plastic.override({color: wheel_color}));
     }
 }
 
 class RoadLane {
-    constructor(base_scene, i) {
-        this.base_scene = base_scene;
-        this.road_width = 2;
-        this.z = - (i*this.road_width);
-        this.model_transform = Mat4.identity().times(Mat4.translation(-40, -1.5, this.z))
-            .times(Mat4.scale(70, 0.01, this.road_width));
+    constructor(game, lane_width, i) {
+        this.game = game;
+        this.lane_width = lane_width;
+        this.road_length = 70;
+        this.z = -(i*this.lane_width);
+        this.model_transform = Mat4.identity().times(Mat4.translation(0, -1.5, this.z));
         this.cars = [];
+        this.direction = Math.floor(Math.random() * 2); //0 - left, 1 - right
     }
 
     addCar() {
@@ -105,15 +152,22 @@ class RoadLane {
             //Add new car if there are no more than 3 cars on the road lane
             //and there is no car immediately in front of new car
             if (this.cars.length > 0) {
-                if (this.cars.length < 4 && this.cars.at(this.cars.length-1).x < 20) {
-                    let car_position = this.z - ((this.road_width - 1)/2);
-                    this.cars.push(new Car(this.base_scene, car_position));
+                if (this.cars.length < 4) {
+                    let car_position = this.z - ((this.lane_width - 1)/2);
+                    if ((this.direction == 1 && this.cars.at(this.cars.length-1).x > -20) ||
+                        (this.direction == 0 && this.cars.at(this.cars.length-1).x < 20)) {
+                        this.cars.push(new Car(this.game, car_position, this.direction));
+                    }
                 }
             } else {
-                let car_position = this.z - ((this.road_width - 1)/2);
-                this.cars.push(new Car(this.base_scene, car_position));
+                let car_position = this.z - ((this.lane_width - 1)/2);
+                this.cars.push(new Car(this.game, car_position, this.direction));
             }
         }
+    }
+
+    scale() {
+        this.scaled_model_transform = this.model_transform.times(Mat4.scale(this.road_length, 0.01, this.lane_width));
     }
 
     render_cars(context, program_state, t) {
@@ -123,7 +177,7 @@ class RoadLane {
         for (let i = 0; i < this.cars.length; i++) {
             let car = this.cars.at(i);
             car.render(context, program_state, t);
-            if (car.x < -40) this.cars.splice(i, 1);
+            if (car.x < -40 || car.x > 30) this.cars.splice(i, 1);
         }
     }
 
@@ -131,7 +185,8 @@ class RoadLane {
         const road_color = hex_color("#4d4d4d");
 
         //Draw road lane
-        this.base_scene.shapes.cube.draw(context, program_state, this.model_transform, this.base_scene.materials.plastic.override({color: road_color}));
+        this.scale();
+        this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: road_color}));
 
         //Draw cars
         this.render_cars(context, program_state, t);
@@ -139,35 +194,58 @@ class RoadLane {
 }
 
 class Road {
-    constructor(base_scene) {
-        this.base_scene = base_scene;
+    constructor(game) {
+        this.game = game;
         this.lanes = [];
-        //Generate random number of lanes per road: min 3, max 6
-        //this.numLanes = 3 + Math.floor(Math.random() * 3);
+        this.tStart = -1;
+        this.lane_width = 2;
+        //Generate random number of lanes per road: min 2, max 8
+        //this.numLanes = 2 + Math.floor(Math.random() * 6);
 
         //For testing, fixed number of lanes
         this.numLanes = 5;
 
         for (let i = 0; i < this.numLanes; i++) {
-            this.lanes.push(new RoadLane(base_scene, i));
+            this.lanes.push(new RoadLane(game, this.lane_width, i));
         }
     }
 
-    //Untested idea for jumping forward action
-    jump_forward(jump_distance) {
-        for (let i = 0; i < this.numLanes; i++) {
-            let lane = this.lanes.at(i);
-            lane.model_transform = lane.model_transform.times(Mat4.translation(0, 0, jump_distance));
-            for (let j = 0; j < lane.cars.length; j++) {
-                let car = lane.cars.at(j);
-                car.model_transform = car.model_transform.times(Mat4.translation(0, 0, jump_distance));
-            }
+    jump_forward(lane, player_angle, t, tMax) {
+
+        let dz = 0.05;
+        //if(lane.z > 0.95) lane.z > 1 ? dz = 0 : dz = 1-lane.z;
+        //console.log(lane.model_transform);
+        lane.model_transform = lane.model_transform.times(Mat4.translation(0, 0, dz));
+        lane.z += dz;
+
+        for (let j = 0; j < lane.cars.length; j++) {
+            let car = lane.cars.at(j);
+            car.shift_forward(dz);
+        }
+
+        if (t >= tMax) {
+            this.tStart = -1;
+            this.game.jumping = false;
         }
     }
 
     render(context, program_state, t) {
+
+        if (this.game.jumping) {
+            for (let i = 0; i < this.lanes.length; i++) {
+                let lane = this.lanes.at(i);
+                if (this.tStart == -1) {
+                    this.tStart = t;
+                }
+                this.jump_forward(lane, 0, t - this.tStart, 1);
+            if (i == 0) console.log("Model transform after dz "+lane.model_transform.toString());
+
+            }
+        }
+
         for (let i = 0; i < this.lanes.length; i++) {
             let lane = this.lanes.at(i);
+            //if (i == 0) console.log(lane.model_transform);
             lane.render(context, program_state, t);
         }
     }
@@ -271,6 +349,7 @@ export class Game extends Base_Scene {
         this.log1 = new Log(this, 15, 2);
         this.log2 = new Log(this, 13, 0);
         this.log3 = new Log(this, 17, 1);
+        this.jumping = false;
     }
     set_view() {
         
@@ -282,6 +361,7 @@ export class Game extends Base_Scene {
 
         this.key_triggered_button("Jump forward", ["i"], () => {
             this.queuedMoves++;
+
         });
         this.key_triggered_button("Turn left", ["j"], () => {
             if(this.dir<=5*Math.PI/12) this.dir += Math.PI/12;
@@ -324,9 +404,12 @@ export class Game extends Base_Scene {
     get_jump_traj(model_transform,t,yMax,tMax){
         let z = -t/tMax;
         let y = -4*yMax*z*(z+1);
+        this.jumping = true;
         if(t>=tMax){
             y = 0; this.tStart = -1; this.queuedMoves--;
             // Shift camera view one unit forward
+            this.jumping = false;
+
         }
         return model_transform.times(Mat4.translation(0,y,z));
     }
