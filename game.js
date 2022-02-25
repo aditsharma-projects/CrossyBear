@@ -66,7 +66,7 @@ class Grass {
     jump_forward(lane, player_angle, t, tMax, dt) {
         //console.log("Player Angle: "+ player_angle.toString())
         //let dz = 0.05; // Try dz = dt;
-        let dz = dt; if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
+        let dz = dt*Math.cos(this.game.dir); if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
         
         
         //if(lane.z > 0.95) lane.z > 1 ? dz = 0 : dz = 1-lane.z;
@@ -166,7 +166,7 @@ class Water {
     jump_forward(lane, player_angle, t, tMax, dt) {
         //console.log("Player Angle: "+ player_angle.toString())
         //let dz = 0.05; // Try dz = dt;
-        let dz = dt; if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
+        let dz = dt*Math.cos(this.game.dir); if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
         
         
         //if(lane.z > 0.95) lane.z > 1 ? dz = 0 : dz = 1-lane.z;
@@ -457,7 +457,7 @@ class Road {
     jump_forward(lane, player_angle, t, tMax, dt) {
         //console.log("Player Angle: "+ player_angle.toString())
         //let dz = 0.05; // Try dz = dt;
-        let dz = dt; if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
+        let dz = dt*Math.cos(this.game.dir); if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
         
         
         //if(lane.z > 0.95) lane.z > 1 ? dz = 0 : dz = 1-lane.z;
@@ -598,6 +598,7 @@ export class Game extends Base_Scene {
         this.log2 = new Log(this, 13, 0);
         this.log3 = new Log(this, 17, 1);*/
         this.jumping = false;
+        this.lateral_translation = Mat4.identity()
     }
     set_view() {
         
@@ -625,6 +626,7 @@ export class Game extends Base_Scene {
     // Returns model_tranform matrix accounting for jumping motion
     // Handles decreasing this.queuedMoves
     get_jump_traj(model_transform,t,yMax,tMax){
+        let t_x = Math.sin(this.dir);
         let z = -t/tMax;
         let y = -4*yMax*z*(z+1);
         this.jumping = true;
@@ -632,22 +634,29 @@ export class Game extends Base_Scene {
             y = 0; this.tStart = -1; this.queuedMoves--;
             // Shift camera view one unit forward
             this.jumping = false;
+            this.lateral_translation = this.lateral_translation.times(Mat4.translation(-t_x,0,0))
 
         }
-        return model_transform.times(Mat4.translation(0,y,z));
+        //return model_transform.times(Mat4.translation(t_x*Math.cos(this.dir)*z,y,t_x*Math.sin(this.dir)*z));
+        return model_transform.times(Mat4.translation(z*t_x,y,0));
     }
 
     render_player(context, program_state, model_transform, t){
         const blue = hex_color("#1a9ffa");
         model_transform = model_transform.times(Mat4.scale( 1, 1.5, 1))
         // Example for drawing a cube, you can remove this line if needed
-        model_transform = model_transform.times(Mat4.rotation(this.dir,0, 1, 0))
+
+        model_transform = model_transform.times(this.lateral_translation)
+        
         // Add transformations for jump movement
         if(this.queuedMoves>0){
             if(this.tStart==-1) this.tStart = t;
             model_transform = this.get_jump_traj(model_transform,program_state.animation_time/1000-this.tStart,1,1);
-
         }
+    
+
+        model_transform = model_transform.times(Mat4.rotation(this.dir,0, 1, 0))
+
         this.shapes.player.draw(context, program_state, model_transform, this.materials.plastic.override({color:blue}));
         model_transform = model_transform.times(Mat4.scale( 1, 2/3, 1));
         model_transform = model_transform.times(Mat4.translation( 0, 0.75, -1.5));
