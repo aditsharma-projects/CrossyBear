@@ -22,6 +22,7 @@ class Player extends Shape {
     }
 }
 
+
 class GrassLane {
     constructor(game, i) {
         this.game = game;
@@ -450,9 +451,12 @@ class Road {
         }
     }
 
-    jump_forward(lane, player_angle, t, tMax) {
-
-        let dz = 0.05;
+    jump_forward(lane, player_angle, t, tMax, dt) {
+        console.log("Player Angle: "+ player_angle.toString())
+        //let dz = 0.05; // Try dz = dt;
+        let dz = dt; if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
+        
+        
         //if(lane.z > 0.95) lane.z > 1 ? dz = 0 : dz = 1-lane.z;
         //console.log(lane.model_transform);
         lane.model_transform = lane.model_transform.times(Mat4.translation(0, 0, dz));
@@ -469,7 +473,7 @@ class Road {
         }
     }
 
-    render(context, program_state, t) {
+    render(context, program_state, t, dt) {
 
         if (this.game.jumping) {
             for (let i = 0; i < this.lanes.length; i++) {
@@ -477,7 +481,7 @@ class Road {
                 if (this.tStart == -1) {
                     this.tStart = t;
                 }
-                this.jump_forward(lane, 0, t - this.tStart, 1);
+                this.jump_forward(lane, this.game.dir, t - this.tStart, 1, dt);
             if (i == 0) console.log("Model transform after dz "+lane.model_transform.toString());
 
             }
@@ -615,31 +619,6 @@ export class Game extends Base_Scene {
         
     }
 
-    draw_box(context, program_state, model_transform, index) {
-        const col = this.colors[index];
-        //const blue = hex_color("#1a9ffa");
-        //let theta = 0.05*Math.PI;
-        let t = program_state.animation_time/1000; // t is in seconds
-        let a = 0.05*Math.PI/2;
-        let b = a;
-        let w = 2*Math.PI/3
-        let theta = this.moving ? a+b*Math.sin(w*t) : 2*a;
-
-        // TODO:  Helper function for requirement 3 (see hint).
-        //        This should make changes to the model_transform matrix, draw the next box, and return the newest model_transform.
-        // Hint:  You can add more parameters for this function, like the desired color, index of the box, etc.
-        model_transform = model_transform.times(Mat4.translation(0,2,0));    
-        model_transform = model_transform.times(Mat4.rotation(theta, 0, 0, 1));
-        //model_transform = model_transform.times(Mat4.translation(-1+Math.cos(theta)-Math.sin(theta),-1+Math.sin(theta)+Math.cos(theta),0)); OLD (INCORRECT) CORRECTION
-        model_transform = model_transform.times(Mat4.translation(1-Math.cos(theta)-Math.sin(theta),1+Math.sin(theta)-Math.cos(theta),0));
-        if(this.outline) this.shapes.outline.draw(context, program_state, model_transform, this.white,"LINES")
-        else{
-            index%2==0 ? this.shapes.strip.draw(context, program_state, model_transform, this.materials.plastic.override({color:col}),"TRIANGLE_STRIP")
-            : this.shapes.cube.draw(context, program_state, model_transform, this.materials.plastic.override({color:col}));
-        }
-        return model_transform;
-    }
-
     // Returns model_tranform matrix accounting for jumping motion
     // Handles decreasing this.queuedMoves
     get_jump_traj(model_transform,t,yMax,tMax){
@@ -675,7 +654,7 @@ export class Game extends Base_Scene {
 
     display(context, program_state) {
         super.display(context, program_state);
-        const t = program_state.animation_time/1000; // t is in seconds
+        const t = program_state.animation_time/1000, dt = program_state.animation_delta_time / 1000; // t is in seconds
         let model_transform = Mat4.identity();
         this.render_player(context, program_state, model_transform, t);
         this.road.render(context, program_state, t);
