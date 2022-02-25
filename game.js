@@ -63,9 +63,12 @@ class Grass {
         }
     }
 
-    jump_forward(lane, player_angle, t, tMax) {
-
-        let dz = 0.05;
+    jump_forward(lane, player_angle, t, tMax, dt) {
+        //console.log("Player Angle: "+ player_angle.toString())
+        //let dz = 0.05; // Try dz = dt;
+        let dz = dt; if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
+        
+        
         //if(lane.z > 0.95) lane.z > 1 ? dz = 0 : dz = 1-lane.z;
         //console.log(lane.model_transform);
         lane.model_transform = lane.model_transform.times(Mat4.translation(0, 0, dz));
@@ -77,14 +80,14 @@ class Grass {
         }
     }
 
-    render(context, program_state, t) {
+    render(context, program_state, t, dt) {
         if (this.game.jumping) {
             for (let i = 0; i < this.lanes.length; i++) {
                 let lane = this.lanes.at(i);
                 if (this.tStart == -1) {
                     this.tStart = t;
                 }
-                this.jump_forward(lane, 0, t - this.tStart, 1);
+                this.jump_forward(lane, 0, t - this.tStart, 1, dt);
 
             }
         }
@@ -160,18 +163,18 @@ class Water {
         }
     }
 
-    jump_forward(lane, player_angle, t, tMax) {
-
-        let dz = 0.05;
+    jump_forward(lane, player_angle, t, tMax, dt) {
+        //console.log("Player Angle: "+ player_angle.toString())
+        //let dz = 0.05; // Try dz = dt;
+        let dz = dt; if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
+        
+        
         //if(lane.z > 0.95) lane.z > 1 ? dz = 0 : dz = 1-lane.z;
         //console.log(lane.model_transform);
         lane.model_transform = lane.model_transform.times(Mat4.translation(0, 0, dz));
         lane.z += dz;
 
-        for (let j = 0; j < lane.logs.length; j++) {
-            let log = lane.logs.at(j);
-            log.shift_forward(dz);
-        }
+        
 
         if (t >= tMax) {
             this.tStart = -1;
@@ -179,7 +182,7 @@ class Water {
         }
     }
 
-    render(context, program_state, t) {
+    render(context, program_state, t, dt) {
 
         if (this.game.jumping) {
             for (let i = 0; i < this.lanes.length; i++) {
@@ -187,8 +190,8 @@ class Water {
                 if (this.tStart == -1) {
                     this.tStart = t;
                 }
-                this.jump_forward(lane, 0, t - this.tStart, 1);
-            if (i == 0) console.log("Model transform after dz "+lane.model_transform.toString());
+                this.jump_forward(lane, 0, t - this.tStart, 1, dt);
+            //if (i == 0) console.log("Model transform after dz "+lane.model_transform.toString());
 
             }
         }
@@ -452,7 +455,7 @@ class Road {
     }
 
     jump_forward(lane, player_angle, t, tMax, dt) {
-        console.log("Player Angle: "+ player_angle.toString())
+        //console.log("Player Angle: "+ player_angle.toString())
         //let dz = 0.05; // Try dz = dt;
         let dz = dt; if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
         
@@ -482,7 +485,7 @@ class Road {
                     this.tStart = t;
                 }
                 this.jump_forward(lane, this.game.dir, t - this.tStart, 1, dt);
-            if (i == 0) console.log("Model transform after dz "+lane.model_transform.toString());
+            //if (i == 0) console.log("Model transform after dz "+lane.model_transform.toString());
 
             }
         }
@@ -657,9 +660,9 @@ export class Game extends Base_Scene {
         const t = program_state.animation_time/1000, dt = program_state.animation_delta_time / 1000; // t is in seconds
         let model_transform = Mat4.identity();
         this.render_player(context, program_state, model_transform, t);
-        this.road.render(context, program_state, t);
-        this.grass.render(context, program_state, t);
-        this.water.render(context, program_state, t);
+        this.road.render(context, program_state, t, dt);
+        this.grass.render(context, program_state, t, dt);
+        this.water.render(context, program_state, t, dt);
         /*this.log1.render(context, program_state, t);
         this.log2.render(context, program_state, t);
         this.log3.render(context, program_state, t);*/
