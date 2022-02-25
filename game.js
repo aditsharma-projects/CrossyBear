@@ -174,6 +174,10 @@ class Water {
         lane.model_transform = lane.model_transform.times(Mat4.translation(0, 0, dz));
         lane.z += dz;
 
+        for (let j = 0; j < lane.logs.length; j++) {
+            let log = lane.logs.at(j);
+            log.shift_forward(dz);
+        }
         
 
         if (t >= tMax) {
