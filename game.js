@@ -22,10 +22,81 @@ class Player extends Shape {
     }
 }
 
-/*class Player extends Cube {
-    
-}*/
 
+class GrassLane {
+    constructor(game, i) {
+        this.game = game;
+        this.lane_width = 2;
+        this.lane_length = 70;
+
+        //To be changed after midway demo
+        this.z = 4 + i*this.lane_width;
+        this.model_transform = Mat4.identity().times(Mat4.translation(0, -1.5, this.z));
+
+        this.grass_color = hex_color("#5db025");
+    }
+
+    scale() {
+        this.scaled_model_transform = this.model_transform.times(Mat4.scale(this.lane_length, 0.01, this.lane_width));
+    }
+
+    render(context, program_state, t) {
+        this.scale();
+        this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: this.grass_color}));
+    }
+}
+
+class Grass {
+    constructor(game) {
+        this.game = game;
+        this.lanes = [];
+        this.tStart = -1;
+        this.lane_width = 2;
+        //Generate random number of lanes per grass: min 2, max 8
+        //this.numLanes = 2 + Math.floor(Math.random() * 6);
+
+        //For testing, fixed number of lanes
+        this.numLanes = 5;
+
+        for (let i = 0; i < this.numLanes; i++) {
+            this.lanes.push(new GrassLane(game, i));
+        }
+    }
+
+    jump_forward(lane, player_angle, t, tMax) {
+
+        let dz = 0.05;
+        //if(lane.z > 0.95) lane.z > 1 ? dz = 0 : dz = 1-lane.z;
+        //console.log(lane.model_transform);
+        lane.model_transform = lane.model_transform.times(Mat4.translation(0, 0, dz));
+        lane.z += dz;
+
+        if (t >= tMax) {
+            this.tStart = -1;
+            this.game.jumping = false;
+        }
+    }
+
+    render(context, program_state, t) {
+        if (this.game.jumping) {
+            for (let i = 0; i < this.lanes.length; i++) {
+                let lane = this.lanes.at(i);
+                if (this.tStart == -1) {
+                    this.tStart = t;
+                }
+                this.jump_forward(lane, 0, t - this.tStart, 1);
+
+            }
+        }
+
+        for (let i = 0; i < this.lanes.length; i++) {
+            let lane = this.lanes.at(i);
+            //if (i == 0) console.log(lane.model_transform);
+            lane.render(context, program_state, t);
+        }
+    }
+}
+/*
 class Log {
     constructor(base_scene, x, z) {
         this.base_scene = base_scene;
@@ -57,7 +128,7 @@ class Water {
     constructor(base_scene) {
         this.base_scene = base_scene;
         this.river_width = 5;
-        this.model_tranform = Mat4.identity().times(Mat4.translation(-40, -1.5, -14.7))
+        this.model_tranform = Mat4.identity().times(Mat4.translation(0, -1.5, -14.7))
             .times(Mat4.scale(70, 1, this.river_width))
             .times(Mat4.rotation(1.5, 1, 0, 0));
     }
@@ -69,6 +140,172 @@ class Water {
         this.base_scene.shapes.sheet.flat_shade();
         this.base_scene.shapes.sheet.draw(context, program_state, this.model_tranform, this.base_scene.materials.water);
         this.base_scene.shapes.sheet.copy_onto_graphics_card(context.context, ["position", "normal"], false);
+    }
+}
+*/
+class Water {
+    constructor(game) {
+        this.game = game;
+        this.lanes = [];
+        this.tStart = -1;
+        this.lane_width = 1;
+        //Generate random number of lanes per road: min 2, max 8
+        //this.numLanes = 2 + Math.floor(Math.random() * 6);
+
+        //For testing, fixed number of lanes
+        this.numLanes = 5;
+
+        for (let i = 0; i < this.numLanes; i++) {
+            this.lanes.push(new WaterLane(game, this.lane_width, i));
+        }
+    }
+
+    jump_forward(lane, player_angle, t, tMax) {
+
+        let dz = 0.05;
+        //if(lane.z > 0.95) lane.z > 1 ? dz = 0 : dz = 1-lane.z;
+        //console.log(lane.model_transform);
+        lane.model_transform = lane.model_transform.times(Mat4.translation(0, 0, dz));
+        lane.z += dz;
+
+        for (let j = 0; j < lane.logs.length; j++) {
+            let log = lane.logs.at(j);
+            log.shift_forward(dz);
+        }
+
+        if (t >= tMax) {
+            this.tStart = -1;
+            this.game.jumping = false;
+        }
+    }
+
+    render(context, program_state, t) {
+
+        if (this.game.jumping) {
+            for (let i = 0; i < this.lanes.length; i++) {
+                let lane = this.lanes.at(i);
+                if (this.tStart == -1) {
+                    this.tStart = t;
+                }
+                this.jump_forward(lane, 0, t - this.tStart, 1);
+            if (i == 0) console.log("Model transform after dz "+lane.model_transform.toString());
+
+            }
+        }
+
+        for (let i = 0; i < this.lanes.length; i++) {
+            let lane = this.lanes.at(i);
+            //if (i == 0) console.log(lane.model_transform);
+            lane.render(context, program_state, t);
+        }
+    }
+
+
+}
+
+
+class WaterLane {
+    constructor(game, lane_width, i) {
+        this.game = game;
+        this.lane_width = lane_width;
+        this.road_length = 70;
+        this.z = -(i*1.5) - 11;
+        this.model_transform = Mat4.identity().times(Mat4.translation(0, -1.5, this.z));
+        this.logs = [];
+        this.direction = Math.floor(Math.random() * 2); //0 - left, 1 - right
+    }
+
+    addLog() {
+        if (Math.random() < 0.001) {
+            //Add new car if there are no more than 3 cars on the road lane
+            //and there is no car immediately in front of new car
+            if (this.logs.length > 0) {
+                if (this.logs.length < 4) {
+                    let log_position = this.z - ((this.lane_width - 1)/2);
+                    if ((this.direction == 1 && this.logs.at(this.logs.length-1).x > -20) ||
+                        (this.direction == 0 && this.logs.at(this.logs.length-1).x < 20)) {
+                        this.logs.push(new Log(this.game, log_position, this.direction));
+                    }
+                }
+            } else {
+                let log_position = this.z - ((this.lane_width - 1)/2);
+                this.logs.push(new Log(this.game, log_position, this.direction));
+            }
+        }
+    }
+
+    scale() {
+        this.scaled_model_transform = this.model_transform.times(Mat4.scale(this.road_length, 1, this.lane_width))
+            .times(Mat4.rotation(1.5, 1, 0, 0));
+    }
+
+    render_logs(context, program_state, t) {
+        this.addLog();
+
+        //Render cars
+        for (let i = 0; i < this.logs.length; i++) {
+            let log = this.logs.at(i);
+            log.render(context, program_state, t);
+            if (log.x < -40 || log.x > 30) this.logs.splice(i, 1);
+        }
+    }
+
+    render(context, program_state, t) {
+        //Draw road lane
+        this.scale();
+        
+        const random = (x) => Math.sin(1000 * x + program_state.animation_time / 1000);
+        this.game.shapes.sheet.arrays.position.forEach((p, i, a) =>
+            a[i] = vec3(p[0], p[1], .15 * random(i / a.length)));
+        this.game.shapes.sheet.flat_shade();
+        this.game.shapes.sheet.draw(context, program_state, this.scaled_model_transform, this.game.materials.water);
+        this.game.shapes.sheet.copy_onto_graphics_card(context.context, ["position", "normal"], false);
+
+        //Draw cars
+        this.render_logs(context, program_state, t);
+    }
+}
+
+class Log {
+    constructor(game, z, direction) {
+        this.log_length = 10;
+        this.direction = direction;
+        if (this.direction == 1) {
+            this.model_transform = Mat4.identity().times(Mat4.translation(-40, -1, z));
+            this.x = -40;
+        } else {
+            this.model_transform = Mat4.identity().times(Mat4.translation(30, -1, z));
+            this.x = 30;
+        }
+        this.scale();
+        this.dx = 0.1;
+        this.game = game;
+    }
+
+    move(t) {
+        if (this.direction == 1) {
+            this.x += this.dx;
+            this.model_transform = this.model_transform.times(Mat4.translation(this.dx, 0, 0));
+        } else {
+            this.x -= this.dx;
+            this.model_transform = this.model_transform.times(Mat4.translation(-this.dx, 0, 0));
+        }
+    }
+
+    shift_forward(z) {
+        this.model_transform = this.model_transform.times(Mat4.translation(0, 0, z));
+    }
+
+    scale() {
+        this.scaled_model_transform = this.model_transform.times(Mat4.rotation(1.57, 0, 1, 0))
+            .times(Mat4.scale(1, 1, this.log_length));
+    }
+
+
+    render(context, program_state, t) {
+        this.move(t)
+        this.scale();
+        this.game.shapes.capped.draw(context, program_state, this.scaled_model_transform, this.game.materials.wood);
     }
 }
 
@@ -352,10 +589,11 @@ export class Game extends Base_Scene {
         this.dir = 0;
         this.tStart = -1;
         this.road = new Road(this);
+        this.grass = new Grass(this);
         this.water = new Water(this);
-        this.log1 = new Log(this, 15, 2);
+        /*this.log1 = new Log(this, 15, 2);
         this.log2 = new Log(this, 13, 0);
-        this.log3 = new Log(this, 17, 1);
+        this.log3 = new Log(this, 17, 1);*/
         this.jumping = false;
     }
     set_view() {
@@ -419,10 +657,11 @@ export class Game extends Base_Scene {
         const t = program_state.animation_time/1000, dt = program_state.animation_delta_time / 1000; // t is in seconds
         let model_transform = Mat4.identity();
         this.render_player(context, program_state, model_transform, t);
-        this.road.render(context, program_state, t, dt);
-        this.water.render(context, program_state);
-        this.log1.render(context, program_state, t);
+        this.road.render(context, program_state, t);
+        this.grass.render(context, program_state, t);
+        this.water.render(context, program_state, t);
+        /*this.log1.render(context, program_state, t);
         this.log2.render(context, program_state, t);
-        this.log3.render(context, program_state, t);
+        this.log3.render(context, program_state, t);*/
     }
 }
