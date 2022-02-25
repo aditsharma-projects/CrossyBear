@@ -49,6 +49,8 @@ class Grass {
     constructor(game) {
         this.game = game;
         this.lanes = [];
+        this.tStart = -1;
+        this.lane_width = 2;
         //Generate random number of lanes per grass: min 2, max 8
         //this.numLanes = 2 + Math.floor(Math.random() * 6);
 
@@ -60,9 +62,35 @@ class Grass {
         }
     }
 
+    jump_forward(lane, player_angle, t, tMax) {
+
+        let dz = 0.05;
+        //if(lane.z > 0.95) lane.z > 1 ? dz = 0 : dz = 1-lane.z;
+        //console.log(lane.model_transform);
+        lane.model_transform = lane.model_transform.times(Mat4.translation(0, 0, dz));
+        lane.z += dz;
+
+        if (t >= tMax) {
+            this.tStart = -1;
+            this.game.jumping = false;
+        }
+    }
+
     render(context, program_state, t) {
+        if (this.game.jumping) {
+            for (let i = 0; i < this.lanes.length; i++) {
+                let lane = this.lanes.at(i);
+                if (this.tStart == -1) {
+                    this.tStart = t;
+                }
+                this.jump_forward(lane, 0, t - this.tStart, 1);
+
+            }
+        }
+
         for (let i = 0; i < this.lanes.length; i++) {
             let lane = this.lanes.at(i);
+            //if (i == 0) console.log(lane.model_transform);
             lane.render(context, program_state, t);
         }
     }
