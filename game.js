@@ -572,7 +572,7 @@ class Base_Scene extends Scene {
         if (!context.scratchpad.controls) {
             this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
             // Define the global camera and projection matrices, which are stored in program_state.
-            program_state.set_camera(Mat4.translation(5, -10, -30));
+            program_state.set_camera(Mat4.translation(0, -5, -30).times(Mat4.rotation(Math.PI/4,1,0,0)));
         }
         program_state.projection_transform = Mat4.perspective(
             Math.PI / 4, context.width / context.height, 1, 100);
@@ -598,11 +598,11 @@ export class Game extends Base_Scene {
         this.road = new Road(this);
         this.grass = new Grass(this);
         this.water = new Water(this);
-        /*this.log1 = new Log(this, 15, 2);
-        this.log2 = new Log(this, 13, 0);
-        this.log3 = new Log(this, 17, 1);*/
+
         this.jumping = false;
-        this.lateral_translation = Mat4.identity()
+        this.lateral_translation = Mat4.identity();
+        this.fp = false;
+        this.player_pos = Mat4.identity();
     }
     set_view() {
         
@@ -610,7 +610,9 @@ export class Game extends Base_Scene {
 
     make_control_panel() {
         // Draw the scene's buttons, setup their actions and keyboard shortcuts, and monitor live measurements.
-        this.key_triggered_button("Toggle Camera View", ["c"], this.set_view);
+        this.key_triggered_button("Toggle Camera View", ["c"], () => {
+            this.fp = !this.fp;
+        });
 
         this.key_triggered_button("Jump forward", ["i"], () => {
             this.queuedMoves++;
@@ -666,10 +668,14 @@ export class Game extends Base_Scene {
         model_transform = model_transform.times(Mat4.translation( 0, 0.75, -1.5));
         model_transform = model_transform.times(Mat4.scale( 1/2, 1/2, 1/2));
         this.shapes.player.draw(context, program_state, model_transform, this.materials.plastic.override({color:blue}));
+        this.player_pos = model_transform.times(Mat4.translation(0,3,5)); //Want fp camera view to be just in front of player
     }
 
     display(context, program_state) {
         super.display(context, program_state);
+        if(this.fp) program_state.set_camera(Mat4.inverse(this.player_pos));
+        else program_state.set_camera(Mat4.translation(0, -5, -30).times(Mat4.rotation(Math.PI/4,1,0,0)));
+        
         const t = program_state.animation_time/1000, dt = program_state.animation_delta_time / 1000; // t is in seconds
         let model_transform = Mat4.identity();
         this.render_player(context, program_state, model_transform, t);
