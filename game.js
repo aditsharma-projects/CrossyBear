@@ -99,53 +99,7 @@ class Grass {
         }
     }
 }
-/*
-class Log {
-    constructor(base_scene, x, z) {
-        this.base_scene = base_scene;
-        this.log_length = 10;
-        this.x = 0;
-        this.dx = 0.02;
-        this.model_transform = Mat4.identity().times(Mat4.rotation(1.57, 0, 1, 0))
-            .times(Mat4.scale(1, 1, this.log_length))
-            .times(Mat4.translation(x, -1.5, z)); 
-    }
 
-    move(t) {
-        this.x -= this.dx;
-        this.model_transform = this.model_transform.times(Mat4.translation(0, 0, -this.dx));
-
-        if (this.x < -10) {
-            this.x = 0;
-            this.model_transform = this.model_transform.times(Mat4.translation(0, 0, 10));
-        }
-    }
-
-    render(context, program_state, t) {
-        this.move(t);
-        this.base_scene.shapes.capped.draw(context, program_state, this.model_transform, this.base_scene.materials.wood);
-    }
-}
-
-class Water {
-    constructor(base_scene) {
-        this.base_scene = base_scene;
-        this.river_width = 5;
-        this.model_tranform = Mat4.identity().times(Mat4.translation(0, -1.5, -14.7))
-            .times(Mat4.scale(70, 1, this.river_width))
-            .times(Mat4.rotation(1.5, 1, 0, 0));
-    }
-
-    render(context, program_state) {
-        const random = (x) => Math.sin(1000 * x + program_state.animation_time / 1000);
-        this.base_scene.shapes.sheet.arrays.position.forEach((p, i, a) =>
-            a[i] = vec3(p[0], p[1], .15 * random(i / a.length)));
-        this.base_scene.shapes.sheet.flat_shade();
-        this.base_scene.shapes.sheet.draw(context, program_state, this.model_tranform, this.base_scene.materials.water);
-        this.base_scene.shapes.sheet.copy_onto_graphics_card(context.context, ["position", "normal"], false);
-    }
-}
-*/
 class Water {
     constructor(game) {
         this.game = game;
@@ -231,12 +185,23 @@ class WaterLane {
                     let log_position = this.z - ((this.lane_width - 1)/2);
                     if ((this.direction == 1 && this.logs.at(this.logs.length-1).x > -20) ||
                         (this.direction == 0 && this.logs.at(this.logs.length-1).x < 20)) {
-                        this.logs.push(new Log(this.game, log_position, this.direction));
+                        if (Math.random() < 0.5) {
+                            this.logs.push(new Log(this.game, log_position, this.direction));
+                        }
+                        else {
+                            this.logs.push(new LilyPad(this.game, log_position, this.direction));
+                        }
+                        
                     }
                 }
             } else {
                 let log_position = this.z - ((this.lane_width - 1)/2);
-                this.logs.push(new Log(this.game, log_position, this.direction));
+                if (Math.random() < 0.5) {
+                    this.logs.push(new Log(this.game, log_position, this.direction));
+                }
+                else {
+                    this.logs.push(new LilyPad(this.game, log_position, this.direction));
+                }
             }
         }
     }
@@ -270,6 +235,49 @@ class WaterLane {
 
         //Draw cars
         this.render_logs(context, program_state, t);
+    }
+}
+
+class LilyPad {
+    constructor(game, z, direction) {
+        this.log_length = 1.5;
+        this.direction = direction;
+        if (this.direction == 1) {
+            this.model_transform = Mat4.identity().times(Mat4.translation(-40, -1, z));
+            this.x = -40;
+        } else {
+            this.model_transform = Mat4.identity().times(Mat4.translation(30, -1, z));
+            this.x = 30;
+        }
+        this.scale();
+        this.dx = 0.1;
+        this.game = game;
+    }
+
+    move(t) {
+        if (this.direction == 1) {
+            this.x += this.dx;
+            this.model_transform = this.model_transform.times(Mat4.translation(this.dx, 0, 0));
+        } else {
+            this.x -= this.dx;
+            this.model_transform = this.model_transform.times(Mat4.translation(-this.dx, 0, 0));
+        }
+    }
+
+    shift_forward(z) {
+        this.model_transform = this.model_transform.times(Mat4.translation(0, 0, z));
+    }
+
+    scale() {
+        this.scaled_model_transform = this.model_transform.times(Mat4.rotation(1.5, 1, 0, 0))
+            .times(Mat4.scale(this.log_length, this.log_length, 0.2));
+    }
+
+
+    render(context, program_state, t) {
+        this.move(t)
+        this.scale();
+        this.game.shapes.capped.draw(context, program_state, this.scaled_model_transform, this.game.materials.leaf);
     }
 }
 
@@ -334,6 +342,7 @@ class Car {
         this.scale();
         this.dx = 0.1;
         this.game = game;
+        this.collided = false;
     }
 
     move(t) {
@@ -373,10 +382,18 @@ class Car {
 
     render(context, program_state, t) {
         const car_color = hex_color("#bd112b");
+        const collide_car_color = hex_color("#FFA500");
         const wheel_color = hex_color("#000000");
-        this.move(t)
+        // console.log(this.model_transform_w1.transposed()[3]);
+        this.move(t);
         this.scale();
-        this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: car_color}));
+        if (this.collided) {
+            this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: collide_car_color}));
+        }
+        else {
+            this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: car_color}));
+        }
+        // console.log(this.collided);
         this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w1, this.game.materials.plastic.override({color: wheel_color}));
         this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w2, this.game.materials.plastic.override({color: wheel_color}));
         this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w3, this.game.materials.plastic.override({color: wheel_color}));
@@ -559,6 +576,7 @@ class Base_Scene extends Scene {
                 {ambient: .4, diffusivity: .6, color: hex_color("#ffffff")}),
             water: new Material(new Water_Shader(), {ambient: 1, diffusivity: 1, specularity: 1, texture: new Texture("assets/clear_water.jpg")}),
             wood: new Material(new defs.Textured_Phong(1), {ambient: .5, texture: new Texture("assets/wood.jpg")}),
+            leaf: new Material(new defs.Textured_Phong(1), {ambient: .5, texture: new Texture("assets/leaf.jpg")}),
         };
         // The white material and basic shader are used for drawing the outline.
         this.white = new Material(new defs.Basic_Shader());
@@ -603,6 +621,7 @@ export class Game extends Base_Scene {
         this.lateral_translation = Mat4.identity();
         this.fp = false;
         this.player_pos = Mat4.identity();
+        this.player_coord = Mat4.identity();
     }
     set_view() {
         
@@ -627,6 +646,35 @@ export class Game extends Base_Scene {
             else this.dir = -Math.PI/2;
         });
         
+    }
+
+    overlap(x, xd, xp, xpd) {
+        if (x <= xp) return (xp <= xd);
+        return (x <= xpd);
+    }
+
+    // Simple collision detection
+    detect_collision_with_player(obstacle) {
+        let obstacle_coord = obstacle.model_transform.transposed()[3].slice(0, 3);
+        let player_coord = this.player_coord.transposed()[3].slice(0, 3);
+
+        let car_x = obstacle_coord[0];
+        let car_y = obstacle_coord[1];
+        let car_z = obstacle_coord[2];
+
+        let player_x = player_coord[0];
+        let player_y = player_coord[1];
+        let player_z = player_coord[2];
+
+        if (this.overlap(car_x, car_x+6, player_x, player_x+2) 
+                && this.overlap(car_y, car_y+3, player_y, player_y+3) 
+                && this.overlap(car_z, car_z+2, player_z, player_z+2)) {
+                obstacle.collided = true;
+            return;
+        }
+        else {
+            obstacle.collided = false;
+        }
     }
 
     // Returns model_tranform matrix accounting for jumping motion
@@ -664,6 +712,7 @@ export class Game extends Base_Scene {
         model_transform = model_transform.times(Mat4.rotation(this.dir,0, 1, 0))
 
         this.shapes.player.draw(context, program_state, model_transform, this.materials.plastic.override({color:blue}));
+        this.player_coord = model_transform;
         model_transform = model_transform.times(Mat4.scale( 1, 2/3, 1));
         model_transform = model_transform.times(Mat4.translation( 0, 0.75, -1.5));
         model_transform = model_transform.times(Mat4.scale( 1/2, 1/2, 1/2));
@@ -678,12 +727,17 @@ export class Game extends Base_Scene {
         
         const t = program_state.animation_time/1000, dt = program_state.animation_delta_time / 1000; // t is in seconds
         let model_transform = Mat4.identity();
+
+        for (let i = 0; i < this.road.lanes.length; i++) {
+            for (let j = 0; j < this.road.lanes[i].cars.length; j++) {
+                let car = this.road.lanes[i].cars[j];
+                this.detect_collision_with_player(car);
+            }
+        }
+        
         this.render_player(context, program_state, model_transform, t);
         this.road.render(context, program_state, t, dt);
         this.grass.render(context, program_state, t, dt);
         this.water.render(context, program_state, t, dt);
-        /*this.log1.render(context, program_state, t);
-        this.log2.render(context, program_state, t);
-        this.log3.render(context, program_state, t);*/
     }
 }
