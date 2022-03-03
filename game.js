@@ -24,13 +24,13 @@ class Player extends Shape {
 
 
 class GrassLane {
-    constructor(game, i) {
+    constructor(game, i, start_z) {
         this.game = game;
         this.lane_width = 2;
         this.lane_length = 70;
 
         //To be changed after midway demo
-        this.z = 4 + i*this.lane_width;
+        this.z = start_z - i*this.lane_width;
         this.model_transform = Mat4.identity().times(Mat4.translation(0, -1.5, this.z));
 
         this.grass_color = hex_color("#5db025");
@@ -47,19 +47,16 @@ class GrassLane {
 }
 
 class Grass {
-    constructor(game) {
+    constructor(game, num_lanes, start_z) {
         this.game = game;
         this.lanes = [];
         this.tStart = -1;
         this.lane_width = 2;
-        //Generate random number of lanes per grass: min 2, max 8
-        //this.numLanes = 2 + Math.floor(Math.random() * 6);
 
-        //For testing, fixed number of lanes
-        this.numLanes = 5;
+        this.num_lanes = num_lanes;
 
-        for (let i = 0; i < this.numLanes; i++) {
-            this.lanes.push(new GrassLane(game, i));
+        for (let i = 0; i < this.num_lanes; i++) {
+            this.lanes.push(new GrassLane(game, i, start_z));
         }
     }
 
@@ -101,19 +98,21 @@ class Grass {
 }
 
 class Water {
-    constructor(game) {
+    constructor(game, num_lanes, start_z) {
         this.game = game;
         this.lanes = [];
         this.tStart = -1;
-        this.lane_width = 1;
-        //Generate random number of lanes per road: min 2, max 8
-        //this.numLanes = 2 + Math.floor(Math.random() * 6);
+        this.lane_width = 2;
 
-        //For testing, fixed number of lanes
-        this.numLanes = 5;
+        if (num_lanes == -1) {
+            //Generate random number of lanes per water: min 1, max 8
+            this.num_lanes = 1 + Math.floor(Math.random() * 7);
+        } else {
+            this.num_lanes = num_lanes;
+        }
 
-        for (let i = 0; i < this.numLanes; i++) {
-            this.lanes.push(new WaterLane(game, this.lane_width, i));
+        for (let i = 0; i < this.num_lanes; i++) {
+            this.lanes.push(new WaterLane(game, this.lane_width, i, start_z));
         }
     }
 
@@ -166,11 +165,11 @@ class Water {
 
 
 class WaterLane {
-    constructor(game, lane_width, i) {
+    constructor(game, lane_width, i, start_z) {
         this.game = game;
         this.lane_width = lane_width;
         this.road_length = 70;
-        this.z = -(i*1.5) - 11;
+        this.z = start_z - (i*this.lane_width);
         this.model_transform = Mat4.identity().times(Mat4.translation(0, -1.5, this.z));
         this.logs = [];
         this.direction = Math.floor(Math.random() * 2); //0 - left, 1 - right
@@ -387,6 +386,7 @@ class Car {
         // console.log(this.model_transform_w1.transposed()[3]);
         this.move(t);
         this.scale();
+        this.game.detect_collision_with_player(this);
         if (this.collided) {
             this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: collide_car_color}));
         }
@@ -402,11 +402,11 @@ class Car {
 }
 
 class RoadLane {
-    constructor(game, lane_width, i) {
+    constructor(game, lane_width, i, start_z) {
         this.game = game;
         this.lane_width = lane_width;
         this.road_length = 70;
-        this.z = -(i*this.lane_width);
+        this.z = start_z -(i*this.lane_width);
         this.model_transform = Mat4.identity().times(Mat4.translation(0, -1.5, this.z));
         this.cars = [];
         this.direction = Math.floor(Math.random() * 2); //0 - left, 1 - right
@@ -459,19 +459,21 @@ class RoadLane {
 }
 
 class Road {
-    constructor(game) {
+    constructor(game, num_lanes, start_z) {
         this.game = game;
         this.lanes = [];
         this.tStart = -1;
         this.lane_width = 2;
-        //Generate random number of lanes per road: min 2, max 8
-        //this.numLanes = 2 + Math.floor(Math.random() * 6);
 
-        //For testing, fixed number of lanes
-        this.numLanes = 5;
+        if (num_lanes == -1) {
+            //Generate random number of lanes per road: min 1, max 8
+            this.num_lanes = 1 + Math.floor(Math.random() * 7);
+        } else {
+            this.num_lanes = num_lanes;
+        }
 
-        for (let i = 0; i < this.numLanes; i++) {
-            this.lanes.push(new RoadLane(game, this.lane_width, i));
+        for (let i = 0; i < this.num_lanes; i++) {
+            this.lanes.push(new RoadLane(game, this.lane_width, i, start_z));
         }
     }
 
@@ -613,15 +615,20 @@ export class Game extends Base_Scene {
         this.queuedMoves = 0;
         this.dir = 0;
         this.tStart = -1;
-        this.road = new Road(this);
-        this.grass = new Grass(this);
-        this.water = new Water(this);
+        this.road = new Road(this, 5);
+        this.grass = new Grass(this, 5);
+        this.water = new Water(this, 5);
 
         this.jumping = false;
         this.lateral_translation = Mat4.identity();
         this.fp = false;
         this.player_pos = Mat4.identity();
         this.player_coord = Mat4.identity();
+        this.sections  = [];
+        this.sections.push(new Grass(this, 5, 6));
+        this.num_lanes = 10;
+        this.last_lane_type = 0; // 0 - Grass, 1 - Road, 2 - Water
+        this.draw_count = 30;
     }
     set_view() {
         
@@ -648,6 +655,43 @@ export class Game extends Base_Scene {
         
     }
 
+    generate_lanes() {
+        let next_lane_type = 0;
+        if (this.num_lanes < this.draw_count) {
+            next_lane_type = 1 + Math.floor(Math.random() * 2); //1 or 2
+            if ((this.last_lane_type == 1 && next_lane_type == 1) ||
+                (this.last_lane_type == 2 && next_lane_type == 2)) {
+                next_lane_type = 0;
+            }
+
+            let last_section = this.sections.at(this.sections.length - 1);
+            let next_z = last_section.lanes.at(last_section.lanes.length-1).z - 4;
+            let next_num_lanes = 1 + Math.floor(Math.random() * 7);
+
+            if (next_lane_type == 0) {
+                this.sections.push(new Grass(this, next_num_lanes, next_z));
+            } else if (next_lane_type == 1) {
+                this.sections.push(new Road(this, next_num_lanes, next_z));
+            } else {
+                this.sections.push(new Water(this, next_num_lanes, next_z));
+            }
+
+            this.last_lane_type = next_lane_type;
+            this.num_lanes += next_num_lanes;
+        }
+
+        let first_section = this.sections.at(0);
+
+        if (first_section.lanes.length > 0 && first_section.lanes.at(0).z > 10) {
+            first_section.lanes.splice(0, 1);
+            this.num_lanes--;
+        }
+
+        if (first_section.lanes.length <= 0) {
+            this.sections.splice(0, 1);
+        }
+    }
+
     overlap(x, xd, xp, xpd) {
         if (x <= xp) return (xp <= xd);
         return (x <= xpd);
@@ -666,13 +710,12 @@ export class Game extends Base_Scene {
         let player_y = player_coord[1];
         let player_z = player_coord[2];
 
-        if (this.overlap(car_x, car_x+6, player_x, player_x+2) 
-                && this.overlap(car_y, car_y+3, player_y, player_y+3) 
-                && this.overlap(car_z, car_z+2, player_z, player_z+2)) {
-                obstacle.collided = true;
+        if (this.overlap(car_x, car_x + 6, player_x, player_x + 2)
+            && this.overlap(car_y, car_y + 3, player_y, player_y + 3)
+            && this.overlap(car_z, car_z + 2, player_z, player_z + 2)) {
+            obstacle.collided = true;
             return;
-        }
-        else {
+        } else {
             obstacle.collided = false;
         }
     }
@@ -728,16 +771,28 @@ export class Game extends Base_Scene {
         const t = program_state.animation_time/1000, dt = program_state.animation_delta_time / 1000; // t is in seconds
         let model_transform = Mat4.identity();
 
-        for (let i = 0; i < this.road.lanes.length; i++) {
+        //Moved this call to car "render" function
+        /*for (let i = 0; i < this.road.lanes.length; i++) {
             for (let j = 0; j < this.road.lanes[i].cars.length; j++) {
                 let car = this.road.lanes[i].cars[j];
                 this.detect_collision_with_player(car);
             }
-        }
+        }*/
         
         this.render_player(context, program_state, model_transform, t);
-        this.road.render(context, program_state, t, dt);
+        /* this.road.render(context, program_state, t, dt);
         this.grass.render(context, program_state, t, dt);
         this.water.render(context, program_state, t, dt);
+        */
+
+        this.generate_lanes();
+        console.log(this.sections);
+        let i = 0, draw_count = this.draw_count;
+        while (i < this.sections.length && draw_count > 0) {
+            let this_section = this.sections.at(i);
+            this_section.render(context, program_state, t, dt);
+            i++;
+            draw_count -= this_section.num_lanes;
+        }
     }
 }
