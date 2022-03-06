@@ -1,4 +1,5 @@
 import {defs, tiny} from './examples/common.js';
+import { Text_Line } from './examples/text-demo.js';
 
 const {
     Vector, Vector3, vec, vec3, vec4, color, hex_color, Matrix, Mat4, Light, Shape, Material, Scene, Texture
@@ -63,7 +64,7 @@ class Grass {
     jump_forward(lane, player_angle, t, tMax, dt) {
         //console.log("Player Angle: "+ player_angle.toString())
         //let dz = 0.05; // Try dz = dt;
-        let dz = dt*Math.cos(this.game.dir); if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
+        let dz = this.game.jump_length*dt*Math.cos(this.game.dir); if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
         
         
         //if(lane.z > 0.95) lane.z > 1 ? dz = 0 : dz = 1-lane.z;
@@ -121,7 +122,7 @@ class Water {
     jump_forward(lane, player_angle, t, tMax, dt) {
         //console.log("Player Angle: "+ player_angle.toString())
         //let dz = 0.05; // Try dz = dt;
-        let dz = dt*Math.cos(this.game.dir); if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
+        let dz = this.game.jump_length*dt*Math.cos(this.game.dir); if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
 
         //if(lane.z > 0.95) lane.z > 1 ? dz = 0 : dz = 1-lane.z;
         //console.log(lane.model_transform);
@@ -577,7 +578,7 @@ class Road {
     jump_forward(lane, player_angle, t, tMax, dt) {
         //console.log("Player Angle: "+ player_angle.toString())
         //let dz = 0.05; // Try dz = dt;
-        let dz = dt*Math.cos(this.game.dir); if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
+        let dz = this.game.jump_length*dt*Math.cos(this.game.dir); if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
         
         
         //if(lane.z > 0.95) lane.z > 1 ? dz = 0 : dz = 1-lane.z;
@@ -667,8 +668,8 @@ class Base_Scene extends Scene {
             sphere: new defs.Subdivision_Sphere(4),
             sheet: new defs.Grid_Patch(10, 10, row_operation, column_operation),
             capped: new defs.Capped_Cylinder(1, 10, [[0, 2], [0, 1]]),
+            text: new Text_Line(20)
         };
-
         // *** Materials
         this.materials = {
             plastic: new Material(new defs.Phong_Shader(),
@@ -676,6 +677,10 @@ class Base_Scene extends Scene {
             water: new Material(new Water_Shader(), {ambient: 1, diffusivity: 1, specularity: 1, texture: new Texture("assets/clear_water.jpg")}),
             wood: new Material(new defs.Textured_Phong(1), {ambient: .5, texture: new Texture("assets/wood.jpg")}),
             leaf: new Material(new defs.Textured_Phong(1), {ambient: .5, texture: new Texture("assets/leaf.jpg")}),
+            text_image: new Material(new defs.Textured_Phong(1), {
+                ambient: 1, diffusivity: 0, specularity: 0,
+                texture: new Texture("assets/text.png")
+            })
         };
         // The white material and basic shader are used for drawing the outline.
         this.white = new Material(new defs.Basic_Shader());
@@ -715,6 +720,9 @@ export class Game extends Base_Scene {
         this.road = new Road(this, 5);
         this.grass = new Grass(this, 5);
         this.water = new Water(this, 5);
+
+        this.score = 0;
+        this.jump_length = 2;
 
         this.jumping = false;
         this.lateral_translation = Mat4.identity();
@@ -805,19 +813,21 @@ export class Game extends Base_Scene {
     // Returns model_tranform matrix accounting for jumping motion
     // Handles decreasing this.queuedMoves
     get_jump_traj(model_transform,t,yMax,tMax){
-        let t_x = Math.sin(this.dir);
-        let z = -t/tMax;
-        let y = -4*yMax*z*(z+1);
+        let t_x = this.jump_length*Math.sin(this.dir);
+        let z = (-t/tMax)*this.jump_length;
+        //let y = -4*yMax*z*(z+1);
+        let y = -4*yMax*z*(z+this.jump_length)/(this.jump_length**2);
         this.jumping = true;
         if(t>=tMax){
             y = 0; this.tStart = -1; this.queuedMoves--;
             // Shift camera view one unit forward
             this.jumping = false;
-            this.lateral_translation = this.lateral_translation.times(Mat4.translation(-t_x,0,0))
+            this.lateral_translation = this.lateral_translation.times(Mat4.translation(-t_x,0,0));
+            this.score = Math.round((this.score + this.jump_length*Math.cos(this.dir))*100)/100;
 
         }
         //return model_transform.times(Mat4.translation(t_x*Math.cos(this.dir)*z,y,t_x*Math.sin(this.dir)*z));
-        return model_transform.times(Mat4.translation(z*t_x,y,0));
+        return model_transform.times(Mat4.translation(z*t_x/this.jump_length,y,0));
     }
 
     render_player(context, program_state, model_transform, t){
@@ -844,6 +854,11 @@ export class Game extends Base_Scene {
         this.player_pos = model_transform.times(Mat4.translation(0,3,5)); //Want fp camera view to be just in front of player
     }
 
+    set_score(context, program_state, model_transform){
+        this.shapes.text.set_string("Current Score: "+this.score.toString(), context.context);
+        this.shapes.text.draw(context, program_state, model_transform.times(Mat4.translation(-10,0,6)), this.materials.text_image);
+    }
+
     display(context, program_state) {
         super.display(context, program_state);
         if(this.fp) program_state.set_camera(Mat4.inverse(this.player_pos));
@@ -851,6 +866,7 @@ export class Game extends Base_Scene {
         
         const t = program_state.animation_time/1000, dt = program_state.animation_delta_time / 1000; // t is in seconds
         let model_transform = Mat4.identity();
+        this.set_score(context, program_state, model_transform);
         this.render_player(context, program_state, model_transform, t);
 
         this.generate_lanes();
