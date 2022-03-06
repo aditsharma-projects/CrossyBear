@@ -750,13 +750,18 @@ export class Game extends Base_Scene {
             this.queuedMoves++;
 
         });
+        this.key_triggered_button("Jump backwards", ["k"], () => {
+            this.dir = (this.dir+Math.PI)%(2*Math.PI);
+            this.queuedMoves++;
+
+        });
         this.key_triggered_button("Turn left", ["j"], () => {
-            if(this.dir<=Math.PI/4) this.dir += Math.PI/4;
-            else this.dir = Math.PI/2;
+            /*if(this.dir<=Math.PI/4)*/ this.dir += Math.PI/4;
+            //else this.dir = Math.PI/2;
         });
         this.key_triggered_button("Turn right", ["l"], () => {
-            if(this.dir>=-Math.PI/4) this.dir -= Math.PI/4;
-            else this.dir = -Math.PI/2;
+            /*if(this.dir>=-Math.PI/4)*/ this.dir -= Math.PI/4;
+            //else this.dir = -Math.PI/2;
         });
         
     }
