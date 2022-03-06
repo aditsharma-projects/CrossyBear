@@ -1,5 +1,6 @@
 import {defs, tiny} from './examples/common.js';
 import { Text_Line } from './examples/text-demo.js';
+import {Shape_From_File} from './examples/obj-file-demo.js';
 
 const {
     Vector, Vector3, vec, vec3, vec4, color, hex_color, Matrix, Mat4, Light, Shape, Material, Scene, Texture
@@ -663,7 +664,7 @@ class Base_Scene extends Scene {
         
         // At the beginning of our program, load one of each of these shape definitions onto the GPU.
         this.shapes = {
-            'player': new Player(),
+            'player': new Shape_From_File("assets/bear.obj"),//new Player(),
             cube: new defs.Cube(),
             sphere: new defs.Subdivision_Sphere(4),
             sheet: new defs.Grid_Patch(10, 10, row_operation, column_operation),
@@ -837,6 +838,7 @@ export class Game extends Base_Scene {
 
     render_player(context, program_state, model_transform, t){
         const blue = hex_color("#1a9ffa");
+        const brown = hex_color("#964B00");
 
         model_transform = model_transform.times(Mat4.scale( 1, 1.5, 1))
 
@@ -848,14 +850,14 @@ export class Game extends Base_Scene {
             model_transform = this.get_jump_traj(model_transform,program_state.animation_time/1000-this.tStart,1,1);
         }
 
-        model_transform = model_transform.times(Mat4.rotation(this.dir,0, 1, 0))
+        model_transform = model_transform.times(Mat4.rotation(this.dir+1.55,0, 1, 0))
 
-        this.shapes.player.draw(context, program_state, model_transform, this.materials.plastic.override({color:blue}));
+        this.shapes.player.draw(context, program_state, model_transform, this.materials.plastic.override({color:brown}));
         this.player_coord = model_transform;
         model_transform = model_transform.times(Mat4.scale( 1, 2/3, 1));
         model_transform = model_transform.times(Mat4.translation( 0, 0.75, -1.5));
         model_transform = model_transform.times(Mat4.scale( 1/2, 1/2, 1/2));
-        this.shapes.player.draw(context, program_state, model_transform, this.materials.plastic.override({color:blue}));
+        // this.shapes.player.draw(context, program_state, model_transform, this.materials.plastic.override({color:blue}));
         this.player_pos = model_transform.times(Mat4.translation(0,3,5)); //Want fp camera view to be just in front of player
     }
 
