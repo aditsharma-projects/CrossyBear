@@ -751,11 +751,11 @@ export class Game extends Base_Scene {
 
         });
         this.key_triggered_button("Turn left", ["j"], () => {
-            if(this.dir<=5*Math.PI/12) this.dir += Math.PI/12;
+            if(this.dir<=Math.PI/4) this.dir += Math.PI/4;
             else this.dir = Math.PI/2;
         });
         this.key_triggered_button("Turn right", ["l"], () => {
-            if(this.dir>=-5*Math.PI/12) this.dir -= Math.PI/12;
+            if(this.dir>=-Math.PI/4) this.dir -= Math.PI/4;
             else this.dir = -Math.PI/2;
         });
         
