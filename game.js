@@ -52,7 +52,7 @@ class Grass {
     constructor(game, num_lanes, start_z) {
         this.game = game;
         this.lanes = [];
-        this.tStart = -1;
+        //this.tStart = -1;
         this.lane_width = 2;
 
         this.num_lanes = num_lanes;
@@ -74,7 +74,7 @@ class Grass {
         lane.z += dz;
 
         if (t >= tMax) {
-            this.tStart = -1;
+            //this.tStart = -1;
             this.game.jumping = false;
         }
     }
@@ -83,10 +83,10 @@ class Grass {
         if (this.game.jumping) {
             for (let i = 0; i < this.lanes.length; i++) {
                 let lane = this.lanes.at(i);
-                if (this.tStart == -1) {
+                /*if (this.tStart == -1) {
                     this.tStart = t;
-                }
-                this.jump_forward(lane, 0, t - this.tStart, 1, dt);
+                }*/
+                this.jump_forward(lane, 0, t - this.game.tStart, 1, dt);
 
             }
         }
@@ -103,7 +103,7 @@ class Water {
     constructor(game, num_lanes, start_z) {
         this.game = game;
         this.lanes = [];
-        this.tStart = -1;
+        //this.tStart = -1;
         this.lane_width = 2;
 
         if (num_lanes == -1) {
@@ -137,7 +137,7 @@ class Water {
         
 
         if (t >= tMax) {
-            this.tStart = -1;
+            //this.tStart = -1;
             this.game.jumping = false;
         }
     }
@@ -147,10 +147,10 @@ class Water {
         if (this.game.jumping) {
             for (let i = 0; i < this.lanes.length; i++) {
                 let lane = this.lanes.at(i);
-                if (this.tStart == -1) {
+                /*if (this.tStart == -1) {
                     this.tStart = t;
-                }
-                this.jump_forward(lane, 0, t - this.tStart, 1, dt);
+                }*/
+                this.jump_forward(lane, 0, t - this.game.tStart, 1, dt);
             //if (i == 0) console.log("Model transform after dz "+lane.model_transform.toString());
 
             }
@@ -561,7 +561,7 @@ class Road {
     constructor(game, num_lanes, start_z) {
         this.game = game;
         this.lanes = [];
-        this.tStart = -1;
+        //this.tStart = -1;
         this.lane_width = 2;
 
         if (num_lanes == -1) {
@@ -593,7 +593,7 @@ class Road {
         }
 
         if (t >= tMax) {
-            this.tStart = -1;
+            //this.game.tStart = -1;
             this.game.jumping = false;
         }
     }
@@ -603,10 +603,10 @@ class Road {
         if (this.game.jumping) {
             for (let i = 0; i < this.lanes.length; i++) {
                 let lane = this.lanes.at(i);
-                if (this.tStart == -1) {
+/*                 if (this.tStart == -1) {
                     this.tStart = t;
-                }
-                this.jump_forward(lane, this.game.dir, t - this.tStart, 1, dt);
+                } */
+                this.jump_forward(lane, this.game.dir, t - this.game.tStart, 1, dt);
             //if (i == 0) console.log("Model transform after dz "+lane.model_transform.toString());
 
             }
