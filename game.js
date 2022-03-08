@@ -75,7 +75,7 @@ class Grass {
 
         if (t >= tMax) {
             //this.tStart = -1;
-            this.game.jumping = false;
+            //this.game.jumping = false;
         }
     }
 
@@ -138,7 +138,7 @@ class Water {
 
         if (t >= tMax) {
             //this.tStart = -1;
-            this.game.jumping = false;
+            //this.game.jumping = false;
         }
     }
 
@@ -594,7 +594,7 @@ class Road {
 
         if (t >= tMax) {
             //this.game.tStart = -1;
-            this.game.jumping = false;
+            //this.game.jumping = false;
         }
     }
 
@@ -603,11 +603,7 @@ class Road {
         if (this.game.jumping) {
             for (let i = 0; i < this.lanes.length; i++) {
                 let lane = this.lanes.at(i);
-/*                 if (this.tStart == -1) {
-                    this.tStart = t;
-                } */
                 this.jump_forward(lane, this.game.dir, t - this.game.tStart, 1, dt);
-            //if (i == 0) console.log("Model transform after dz "+lane.model_transform.toString());
 
             }
         }
@@ -847,7 +843,8 @@ export class Game extends Base_Scene {
         // Add transformations for jump movement
         if(this.queuedMoves>0){
             if(this.tStart==-1) this.tStart = t;
-            model_transform = this.get_jump_traj(model_transform,program_state.animation_time/1000-this.tStart,1,1);
+            if(this.queuedMoves==1) model_transform = this.get_jump_traj(model_transform,program_state.animation_time/1000-this.tStart,1,1);
+            else model_transform = this.get_jump_traj(model_transform,1,1,1);
         }
 
         model_transform = model_transform.times(Mat4.rotation(this.dir,0, 1, 0))
@@ -875,12 +872,19 @@ export class Game extends Base_Scene {
         const t = program_state.animation_time/1000, dt = program_state.animation_delta_time / 1000; // t is in seconds
         let model_transform = Mat4.identity();
         this.set_score(context, program_state, model_transform);
-        this.render_player(context, program_state, model_transform, t);
+        
 
         this.generate_lanes();
         for (let i = 0; i < this.sections.length; i++) {
             let this_section = this.sections.at(i);
-            this_section.render(context, program_state, t, dt);
+            let time = t; let d_time = dt;
+            if(this.queuedMoves>1){
+                time = this.tStart+1;
+                d_time = time-t;
+            }
+            this_section.render(context, program_state, time, d_time);
         }
+
+        this.render_player(context, program_state, model_transform, t);
     }
 }
