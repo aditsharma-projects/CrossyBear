@@ -850,9 +850,10 @@ export class Game extends Base_Scene {
             model_transform = this.get_jump_traj(model_transform,program_state.animation_time/1000-this.tStart,1,1);
         }
 
-        model_transform = model_transform.times(Mat4.rotation(this.dir+1.55,0, 1, 0))
+        model_transform = model_transform.times(Mat4.rotation(this.dir,0, 1, 0))
+        let player_transform = model_transform.times(Mat4.rotation(Math.PI/2,0, 1, 0))
 
-        this.shapes.player.draw(context, program_state, model_transform, this.materials.plastic.override({color:brown}));
+        this.shapes.player.draw(context, program_state, player_transform, this.materials.plastic.override({color:brown}));
         this.player_coord = model_transform;
         model_transform = model_transform.times(Mat4.scale( 1, 2/3, 1));
         model_transform = model_transform.times(Mat4.translation( 0, 0.75, -1.5));
