@@ -44,7 +44,7 @@ class GrassLane {
 
     render(context, program_state, t) {
         this.scale();
-        this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: this.grass_color}));
+        this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.grass);
     }
 }
 
@@ -550,7 +550,7 @@ class RoadLane {
 
         //Draw road lane
         this.scale();
-        this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: road_color}));
+        this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.road);
 
         //Draw cars
         this.render_cars(context, program_state, t);
@@ -674,6 +674,8 @@ class Base_Scene extends Scene {
             water: new Material(new Water_Shader(), {ambient: 1, diffusivity: 1, specularity: 1, texture: new Texture("assets/clear_water.jpg")}),
             wood: new Material(new defs.Textured_Phong(1), {ambient: .5, texture: new Texture("assets/wood.jpg")}),
             leaf: new Material(new defs.Textured_Phong(1), {ambient: .5, texture: new Texture("assets/leaf.jpg")}),
+            grass: new Material(new defs.Textured_Phong(1), {ambient: 1, texture: new Texture("assets/grass.jpeg"), color: hex_color("#000000")}),
+            road: new Material(new defs.Textured_Phong(1), {ambient: 1, texture: new Texture("assets/road.jpeg"), color: hex_color("#000000")}),
             text_image: new Material(new defs.Textured_Phong(1), {
                 ambient: 1, diffusivity: 0, specularity: 0,
                 texture: new Texture("assets/text.png")
