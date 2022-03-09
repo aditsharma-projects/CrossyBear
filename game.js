@@ -6,24 +6,90 @@ const {
     Vector, Vector3, vec, vec3, vec4, color, hex_color, Matrix, Mat4, Light, Shape, Material, Scene, Texture
 } = tiny;
 
-class Player extends Shape {
-    constructor() {
-        super("position", "normal",);
-        // Loop 3 times (for each axis), and inside loop twice (for opposing cube sides):
-        this.arrays.position = Vector3.cast(
-            [-1, -1, -1], [1, -1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, -1], [-1, 1, -1], [1, 1, 1], [-1, 1, 1],
-            [-1, -1, -1], [-1, -1, 1], [-1, 1, -1], [-1, 1, 1], [1, -1, 1], [1, -1, -1], [1, 1, 1], [1, 1, -1],
-            [-1, -1, 1], [1, -1, 1], [-1, 1, 1], [1, 1, 1], [1, -1, -1], [-1, -1, -1], [1, 1, -1], [-1, 1, -1]);
-        this.arrays.normal = Vector3.cast(
-            [0, -1, 0], [0, -1, 0], [0, -1, 0], [0, -1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0],
-            [-1, 0, 0], [-1, 0, 0], [-1, 0, 0], [-1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0],
-            [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, -1], [0, 0, -1], [0, 0, -1], [0, 0, -1]);
-        // Arrange the vertices into a square shape in texture space too:
-        this.indices.push(0, 1, 2, 1, 3, 2, 4, 5, 6, 5, 7, 6, 8, 9, 10, 9, 11, 10, 12, 13,
-            14, 13, 15, 14, 16, 17, 18, 17, 19, 18, 20, 21, 22, 21, 23, 22);
+class RedLane {
+    constructor(game, i, start_z) {
+        this.game = game;
+        this.lane_width = 2;
+        this.lane_length = 70;
+
+        this.z = start_z - i*this.lane_width;
+        this.model_transform = Mat4.identity().times(Mat4.translation(0, -1.5, this.z));
+
+        this.red_color = hex_color("#f31515");
+    }
+
+    scale() {
+        this.scaled_model_transform = this.model_transform.times(Mat4.scale(this.lane_length, 0.01, this.lane_width));
+    }
+
+    shift_forward(z) {
+        this.model_transform = this.model_transform.times(Mat4.translation(0, 0, z));
+    }
+
+    detect_collision_with_player() {
+        let this_coord = this.model_transform.transposed()[3].slice(0, 3);
+        let player_coord = this.game.player_coord.transposed()[3].slice(0, 3);
+
+        let this_z = this_coord[2];
+        let player_z = player_coord[2];
+
+        if (this.game.overlap(this_z, this_z + 2, player_z + 2, player_z + 2) && !this.game.jumping) {
+            this.collided = true;
+        } else {
+            this.collided = false;
+        }
+    }
+
+    render(context, program_state, t) {
+        this.scale();
+        this.detect_collision_with_player();
+        if (this.collided) this.game.player_dead = true;
+        this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color:this.red_color}));
     }
 }
 
+class RedSection {
+    constructor(game, num_lanes, start_z) {
+        this.game = game;
+        this.lanes = [];
+        //this.tStart = -1;
+        this.lane_width = 2;
+
+        this.num_lanes = num_lanes;
+
+        for (let i = 0; i < this.num_lanes; i++) {
+            this.lanes.push(new RedLane(game, i, start_z));
+        }
+    }
+
+    jump_forward(lane, t, tMax, dt) {
+        let dz = this.game.jump_length*dt*Math.cos(this.game.dir); if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
+        lane.model_transform = lane.model_transform.times(Mat4.translation(0, 0, dz));
+        lane.z += dz;
+    }
+
+    shift_forward_lanes() {
+        for (let i = 0; i < this.lanes.length; i++) {
+            let lane = this.lanes.at(i);
+            lane.shift_forward(-2);
+        }
+    }
+
+    render(context, program_state, t, dt) {
+        if (this.game.jumping) {
+            for (let i = 0; i < this.lanes.length; i++) {
+                let lane = this.lanes.at(i);
+                this.jump_forward(lane, t - this.game.tStart, 1, dt);
+
+            }
+        }
+
+        for (let i = 0; i < this.lanes.length; i++) {
+            let lane = this.lanes.at(i);
+            lane.render(context, program_state, t);
+        }
+    }
+}
 
 class GrassLane {
     constructor(game, i, start_z) {
@@ -31,7 +97,6 @@ class GrassLane {
         this.lane_width = 2;
         this.lane_length = 70;
 
-        //To be changed after midway demo
         this.z = start_z - i*this.lane_width;
         this.model_transform = Mat4.identity().times(Mat4.translation(0, -1.5, this.z));
 
@@ -104,7 +169,7 @@ class Water {
         this.game = game;
         this.lanes = [];
         //this.tStart = -1;
-        this.lane_width = 2;
+        this.lane_width = 2.5;
 
         if (num_lanes == -1) {
             //Generate random number of lanes per water: min 1, max 8
@@ -112,10 +177,13 @@ class Water {
         } else {
             this.num_lanes = num_lanes;
         }
-
+        let log_or_lilypad = 0;
         for (let i = 0; i < this.num_lanes; i++) {
-            let log_or_lilypad = 0;
-            if (Math.random() < 0.1) log_or_lilypad = 1;
+            if (log_or_lilypad == 1) {
+                log_or_lilypad = 0;
+            } else {
+                if (Math.random() < 0.1) log_or_lilypad = 1;
+            }
             this.lanes.push(new WaterLane(game, this.lane_width, i, start_z, log_or_lilypad));
         }
     }
@@ -181,14 +249,14 @@ class WaterLane {
     }
 
     addLog() {
-        if (Math.random() < 0.003) {
+        if (Math.random() < 0.01) {
             //Add new car if there are no more than 3 cars on the road lane
             //and there is no car immediately in front of new car
             if (this.obstacles.length > 0) {
                 if (this.obstacles.length < 4) {
-                    let log_position = this.z - ((this.lane_width - 1)/2);
-                    if ((this.direction == 1 && this.obstacles.at(this.obstacles.length-1).x > -10) ||
-                        (this.direction == 0 && this.obstacles.at(this.obstacles.length-1).x < 10)) {
+                    let log_position = this.z + ((this.lane_width - 1)/2);
+                    if ((this.direction == 1 && this.obstacles.at(this.obstacles.length-1).x > -20) ||
+                        (this.direction == 0 && this.obstacles.at(this.obstacles.length-1).x < 20)) {
                         this.obstacles.push(new Log(this.game, log_position, this.direction));
                     }
                 }
@@ -202,7 +270,7 @@ class WaterLane {
     addLilypads() {
         let num_lilypads = 1;
         let lilypad_x = 4 * Math.floor(Math.random() * 3);
-        let lilypad_z = this.z - ((this.lane_width - 1)/2);
+        let lilypad_z = this.z + ((this.lane_width - 1.5)/2);
 
         //One guaranteed lilypad
         this.obstacles.push(new LilyPad(this.game, lilypad_x, lilypad_z));
@@ -227,7 +295,7 @@ class WaterLane {
         for (let i = 0; i < this.obstacles.length; i++) {
             let log = this.obstacles.at(i);
             log.render(context, program_state, t);
-            if (log.x < -40 || log.x > 30) this.obstacles.splice(i, 1);
+            if (log.x < -40 || log.x > 40) this.obstacles.splice(i, 1);
         }
     }
 
@@ -242,19 +310,25 @@ class WaterLane {
         let this_coord = this.model_transform.transposed()[3].slice(0, 3);
         let player_coord = this.game.player_coord.transposed()[3].slice(0, 3);
 
+        let this_y = this_coord[1];
         let this_z = this_coord[2];
-
+        let player_y = player_coord[1];
         let player_z = player_coord[2];
 
-        if (this.game.overlap(this_z, this_z + 2, player_z + 2, player_z + 2)) {
-            this.collided = true;
+        if (this.game.overlap(this_z, this_z + 2, player_z + 1.5*Math.cos(this.game.dir), player_z + 1.5*Math.cos(this.game.dir)) &&
+            (this.game.overlap(this_y, this_y, player_y-1.5, player_y))) {
+            /*let is_on_obstacle = false;
+            for (let i = 0; i < this.obstacles.length; i++) {
+                let obstacle = this.obstacles.at(i);
+                if (obstacle.collided) is_on_obstacle = true;
+            }*/
+            if (!this.game.on_a_log && !this.game.on_a_lilypad) this.collided = true;
         } else {
             this.collided = false;
         }
     }
 
     render(context, program_state, t) {
-        //Draw road lane
         this.scale();
         
         const random = (x) => Math.sin(1000 * x + program_state.animation_time / 1000);
@@ -264,10 +338,12 @@ class WaterLane {
 
         this.detect_collision_with_player();
         if (this.collided) {
-            this.game.shapes.sheet.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: hex_color("#f31515")}));
+            this.game.sinking = true;
+            this.game.shapes.sheet.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color:hex_color("#f31515")}));
         } else {
             this.game.shapes.sheet.draw(context, program_state, this.scaled_model_transform, this.game.materials.water);
         }
+
         this.game.shapes.sheet.copy_onto_graphics_card(context.context, ["position", "normal"], false);
 
         if (this.log_or_lilypad == 0) {
@@ -308,7 +384,9 @@ class LilyPad {
         if (this.game.overlap(this_x, this_x + 2, player_x, player_x + 2)
             && this.game.overlap(this_z, this_z + 2, player_z, player_z + 2)) {
             this.collided = true;
+            this.game.on_a_lilypad = true;
         } else {
+            if (this.collided) this.game.on_a_lilypad = false;
             this.collided = false;
         }
     }
@@ -321,8 +399,7 @@ class LilyPad {
 
         if (this.collided) {
             this.game.shapes.capped.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: hex_color("#fa0909")}));
-        }
-        else {
+        } else {
             this.game.shapes.capped.draw(context, program_state, this.scaled_model_transform, this.game.materials.leaf);
         }
     }
@@ -336,11 +413,11 @@ class Log {
             this.model_transform = Mat4.identity().times(Mat4.translation(-40, -1, z));
             this.x = -40;
         } else {
-            this.model_transform = Mat4.identity().times(Mat4.translation(30, -1, z));
-            this.x = 30;
+            this.model_transform = Mat4.identity().times(Mat4.translation(40, -1, z));
+            this.x = 40;
         }
         this.scale();
-        this.dx = 0.1;
+        this.dx = 0.04;
         this.game = game;
     }
 
@@ -368,16 +445,16 @@ class Log {
         let player_coord = this.game.player_coord.transposed()[3].slice(0, 3);
 
         let this_x = this_coord[0];
-        let this_y = this_coord[1];
         let this_z = this_coord[2];
 
         let player_x = player_coord[0];
-        let player_y = player_coord[1];
         let player_z = player_coord[2];
 
         if (this.game.overlap(this_x - 3, this_x + 6, player_x, player_x + 2)
-            && this.game.overlap(this_z, this_z + 2, player_z, player_z + 2)) {
+            && this.game.overlap(this_z+0.5, this_z + 1.5, player_z, player_z + 2)
+            && !this.game.sinking) {
             this.collided = true;
+            this.game.on_a_log = true;
             //Move player with log
             if (this.direction == 0) {
                 this.game.lateral_translation = this.game.lateral_translation.times(Mat4.translation(-this.dx, 0, 0));
@@ -385,6 +462,7 @@ class Log {
                 this.game.lateral_translation = this.game.lateral_translation.times(Mat4.translation(this.dx, 0, 0));
             }
         } else {
+            if (this.collided) this.game.on_a_log = false;
             this.collided = false;
         }
     }
@@ -412,8 +490,8 @@ class Car {
             this.model_transform = Mat4.identity().times(Mat4.translation(-40, 1, z));
             this.x = -40;
         } else {
-            this.model_transform = Mat4.identity().times(Mat4.translation(30, 1, z));
-            this.x = 30;
+            this.model_transform = Mat4.identity().times(Mat4.translation(40, 1, z));
+            this.x = 40;
         }
         this.model_transform_w1 = this.model_transform.times(Mat4.translation(-1.5, -1.5, 1));
         this.model_transform_w2 = this.model_transform_w1.times(Mat4.translation(3, 0, 0));
@@ -469,9 +547,10 @@ class Car {
         let player_x = player_coord[0];
         let player_z = player_coord[2];
 
-        if (this.game.overlap(car_x, car_x + 3, player_x, player_x + 2)
+        if (this.game.overlap(car_x, car_x + 3, player_x, player_x + 3)
             && this.game.overlap(car_z, car_z + 2, player_z, player_z + 2)) {
             this.collided = true;
+            this.game.car_direction = this.direction;
         } else {
             this.collided = false;
         }
@@ -482,17 +561,15 @@ class Car {
         const car_color = hex_color("#bd112b");
         const collide_car_color = hex_color("#FFA500");
         const wheel_color = hex_color("#000000");
-        // console.log(this.model_transform_w1.transposed()[3]);
-        this.move(t);
+        if (!this.game.hit_by_car) this.move(t);
         this.scale();
         this.detect_collision_with_player();
         if (this.collided) {
+            this.game.hit_by_car = true;
             this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: collide_car_color}));
-        }
-        else {
+        } else {
             this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: car_color}));
         }
-        // console.log(this.collided);
         this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w1, this.game.materials.plastic.override({color: wheel_color}));
         this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w2, this.game.materials.plastic.override({color: wheel_color}));
         this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w3, this.game.materials.plastic.override({color: wheel_color}));
@@ -512,7 +589,7 @@ class RoadLane {
     }
 
     addCar() {
-        if (Math.random() < 0.001) {
+        if (Math.random() < 0.002) {
             //Add new car if there are no more than 3 cars on the road lane
             //and there is no car immediately in front of new car
             if (this.cars.length > 0) {
@@ -541,7 +618,7 @@ class RoadLane {
         for (let i = 0; i < this.cars.length; i++) {
             let car = this.cars.at(i);
             car.render(context, program_state, t);
-            if (car.x < -40 || car.x > 30) this.cars.splice(i, 1);
+            if (car.x < -40 || car.x > 40) this.cars.splice(i, 1);
         }
     }
 
@@ -590,11 +667,6 @@ class Road {
         for (let j = 0; j < lane.cars.length; j++) {
             let car = lane.cars.at(j);
             car.shift_forward(dz);
-        }
-
-        if (t >= tMax) {
-            //this.game.tStart = -1;
-            //this.game.jumping = false;
         }
     }
 
@@ -713,12 +785,13 @@ export class Game extends Base_Scene {
      */
     constructor() {
         super();
+        this.reset();
+    }
+
+    reset() {
         this.queuedMoves = 0;
         this.dir = 0;
         this.tStart = -1;
-        this.road = new Road(this, 5);
-        this.grass = new Grass(this, 5);
-        this.water = new Water(this, 5);
 
         this.score = 0;
         this.jump_length = 2;
@@ -726,7 +799,6 @@ export class Game extends Base_Scene {
         this.jumping = false;
         this.lateral_translation = Mat4.identity();
         this.fp = false;
-        this.player_model_transform = Mat4.identity();
         this.player_pos = Mat4.identity();
         this.player_coord = Mat4.identity();
         this.sections  = [];
@@ -734,9 +806,13 @@ export class Game extends Base_Scene {
         this.num_lanes = 10;
         this.last_lane_type = 0; // 0 - Grass, 1 - Road, 2 - Water
         this.draw_count = 30;
-    }
-    set_view() {
-        
+        this.red_section = new RedSection(this, 5, 18);
+        this.hit_by_car = false;
+        this.car_direction = 0; //0 - car going left, 1 - right
+        this.sinking = false;
+        this.on_a_log = false;
+        this.on_a_lilypad = false;
+        this.player_dead = false;
     }
 
     make_control_panel() {
@@ -755,12 +831,10 @@ export class Game extends Base_Scene {
 
         });
         this.key_triggered_button("Turn left", ["j"], () => {
-            /*if(this.dir<=Math.PI/4)*/ this.dir += Math.PI/4;
-            //else this.dir = Math.PI/2;
+            this.dir = (this.dir+(Math.PI/4)%(2*Math.PI));
         });
         this.key_triggered_button("Turn right", ["l"], () => {
-            /*if(this.dir>=-Math.PI/4)*/ this.dir -= Math.PI/4;
-            //else this.dir = -Math.PI/2;
+            this.dir = (this.dir-(Math.PI/4)%(2*Math.PI));
         });
         
     }
@@ -798,7 +872,8 @@ export class Game extends Base_Scene {
         let first_section = this.sections.at(0);
 
         //Delete lane if it is out of bounds
-        if (first_section.lanes.length > 0 && first_section.lanes.at(0).z > 10) {
+        if (first_section.lanes.length > 0 && first_section.lanes.at(0).z > 16) {
+            this.red_section.shift_forward_lanes();
             first_section.lanes.splice(0, 1);
             this.num_lanes--;
         }
@@ -814,6 +889,40 @@ export class Game extends Base_Scene {
         return (x <= xpd);
     }
 
+    player_out_of_bounds() {
+        let player_coord = this.player_coord.transposed()[3].slice(0, 3);
+        let player_x = player_coord[0];
+
+        if (player_x > 30 || player_x < -30) return true;
+        else return false;
+    }
+
+    sink_in_water(model_transform, t,tMax) {
+        let y = (-t/tMax)*4;
+
+        if (t >= tMax) {
+            this.player_dead = true;
+            this.sinking = false;
+            this.tStart = -1;
+        }
+
+        return model_transform.times(Mat4.translation(0,y,0));
+    }
+
+    fall_over(model_transform, t,tMax, direction) {
+
+        let theta = (t/tMax)*(Math.PI/2);
+        if (direction == 1) theta = -1 * theta;
+
+        if (t >= tMax) {
+            this.player_dead = true;
+            this.hit_by_car = false;
+            this.tStart = -1;
+        }
+
+        return model_transform.times(Mat4.rotation(theta, 0,0,1));
+    }
+
     // Returns model_tranform matrix accounting for jumping motion
     // Handles decreasing this.queuedMoves
     get_jump_traj(model_transform,t,yMax,tMax){
@@ -827,27 +936,50 @@ export class Game extends Base_Scene {
             // Shift camera view one unit forward
             this.jumping = false;
             this.lateral_translation = this.lateral_translation.times(Mat4.translation(-t_x,0,0));
-            this.score = Math.round((this.score + this.jump_length*Math.cos(this.dir))*100)/100;
+
+            //Score can only increase
+            let dScore = Math.round(this.jump_length*Math.cos(this.dir));
+            if (dScore > 0) this.score += dScore;
 
         }
+
         //return model_transform.times(Mat4.translation(t_x*Math.cos(this.dir)*z,y,t_x*Math.sin(this.dir)*z));
         return model_transform.times(Mat4.translation(z*t_x/this.jump_length,y,0));
     }
 
     render_player(context, program_state, model_transform, t){
-        const blue = hex_color("#1a9ffa");
         const brown = hex_color("#964B00");
 
-        model_transform = model_transform.times(Mat4.scale( 1, 1.5, 1))
+        if(this.sinking) {
+            if(this.tStart==-1) this.tStart = t;
+            model_transform = this.sink_in_water(model_transform, program_state.animation_time/1000-this.tStart, 1);
+        }
+
+        if(this.hit_by_car) {
+            if(this.tStart==-1) this.tStart = t;
+            model_transform = this.fall_over(model_transform, program_state.animation_time/1000-this.tStart, 1, this.car_direction);
+        }
+
+        if(this.on_a_log) {
+            model_transform = model_transform.times(Mat4.translation(0, 1,0));
+        }
+
+        if(this.on_a_lilypad) {
+            model_transform = model_transform.times(Mat4.translation(0, 0.25,0));
+        }
+
+            //model_transform = model_transform.times(Mat4.translation(0, 0, -0.5));
+        model_transform = model_transform.times(Mat4.scale( 1, 1.5, 1));
 
         model_transform = model_transform.times(this.lateral_translation)
         
         // Add transformations for jump movement
-        if(this.queuedMoves>0){
+        if(this.queuedMoves>0 && !this.sinking && !this.hit_by_car){
             if(this.tStart==-1) this.tStart = t;
-            if(this.queuedMoves==1) model_transform = this.get_jump_traj(model_transform,program_state.animation_time/1000-this.tStart,1,1);
+            if (this.queuedMoves==1) model_transform = this.get_jump_traj(model_transform,program_state.animation_time/1000-this.tStart,1,1);
             else model_transform = this.get_jump_traj(model_transform,1,1,1);
         }
+
 
         model_transform = model_transform.times(Mat4.rotation(this.dir,0, 1, 0))
         let player_transform = model_transform.times(Mat4.rotation(Math.PI/2,0, 1, 0))
@@ -887,6 +1019,15 @@ export class Game extends Base_Scene {
             this_section.render(context, program_state, time, d_time);
         }
 
+        let time = t; let d_time = dt;
+        if(this.queuedMoves>1){
+            time = this.tStart+1;
+            d_time = time-t;
+        }
+        this.red_section.render(context, program_state, time, d_time);
         this.render_player(context, program_state, model_transform, t);
+        if(this.player_out_of_bounds()) this.player_dead = true;
+
+        if (this.player_dead) this.reset();
     }
 }
