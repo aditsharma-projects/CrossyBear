@@ -845,6 +845,19 @@ class Base_Scene extends Scene {
             capped: new defs.Capped_Cylinder(1, 10, [[0, 2], [0, 1]]),
             text: new Text_Line(20)
         };
+
+        //Texture coordinates
+        this.shapes.cube.arrays.texture_coord.forEach(
+            (v, i, l) => {
+                v[0] = v[0] * 25;
+            }
+        )
+        this.shapes.sheet.arrays.texture_coord.forEach(
+            (v, i, l) => {
+                v[0] = v[0] * 10;
+            }
+        )
+
         // *** Materials
         this.materials = {
             plastic: new Material(new defs.Phong_Shader(),
