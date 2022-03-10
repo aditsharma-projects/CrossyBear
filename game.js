@@ -388,6 +388,7 @@ class WaterLane {
 class Tree {
     constructor(game, x, z) {
         this.tree_length = 1;
+        this.tree_height = (Math.random() * 2) + 1;
         this.model_transform = Mat4.identity().times(Mat4.translation(x, 2, z));
         this.scale();
         this.game = game;
@@ -400,8 +401,8 @@ class Tree {
 
     scale() {
         this.scaled_model_transform = this.model_transform.times(Mat4.rotation(Math.PI * 2, 1, 0, 0)).times(Mat4.rotation(this.rotation_y, 0, 1, 0))
-            .times(Mat4.scale(this.tree_length, this.tree_length, 1));
-        this.scaled_model_transform_w1 = this.model_transform.times(Mat4.translation(0, 2, 0)).times(Mat4.scale(2, 2, 2)).times(Mat4.rotation(this.rotation_y, 0, 1, 0));
+            .times(Mat4.scale(this.tree_length, this.tree_height, 1));
+        this.scaled_model_transform_w1 = this.model_transform.times(Mat4.translation(0, 1 + this.tree_height, 0)).times(Mat4.scale(this.tree_height, this.tree_height, this.tree_height)).times(Mat4.rotation(this.rotation_y, 0, 1, 0));
     }
 
     render(context, program_state, t) {
