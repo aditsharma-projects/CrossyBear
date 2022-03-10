@@ -105,11 +105,7 @@ class GrassLane {
 
     addTrees() {
         let num_trees = 1;
-        let tree_x = 4 * Math.floor(Math.random() * 3);
         let tree_z = this.z + ((this.lane_width - 1.5)/2);
-
-        //One guaranteed lilypad
-        this.obstacles.push(new Tree(this.game, tree_x, tree_z));
 
         //Random chance to generate up to 10 trees
         for (let i = -40; i < 30; i += 4) {
@@ -210,7 +206,7 @@ class Water {
         }
         let log_or_lilypad = 0;
         for (let i = 0; i < this.num_lanes; i++) {
-            if (log_or_lilypad == 1) {
+            if (this.lanes.length > 0 && this.lanes.at(i-1).log_or_lilypad != 0) {
                 log_or_lilypad = 0;
             } else {
                 if (Math.random() < 0.1) log_or_lilypad = 1;
@@ -276,13 +272,13 @@ class WaterLane {
         this.obstacles = [];
         this.direction = Math.floor(Math.random() * 2); //0 - left, 1 - right
         this.log_or_lilypad = log_or_lilypad; //0 - log, 1 - lilypad
-        if (this.log_or_lilypad == 1) this.addLilypads();
+        if (this.log_or_lilypad > 0) this.addLilypads();
     }
 
     addLog() {
         if (Math.random() < 0.01) {
-            //Add new car if there are no more than 3 cars on the road lane
-            //and there is no car immediately in front of new car
+            //Add new log if there are no more than 3 cars on the road lane
+            //and there is no log immediately in front of new log
             if (this.obstacles.length > 0) {
                 if (this.obstacles.length < 4) {
                     let log_position = this.z + ((this.lane_width - 1)/2);
@@ -292,7 +288,7 @@ class WaterLane {
                     }
                 }
             } else {
-                let log_position = this.z - ((this.lane_width)/2);
+                let log_position = this.z + ((this.lane_width - 1)/2);
                 this.obstacles.push(new Log(this.game, log_position, this.direction));
             }
         }
@@ -347,6 +343,7 @@ class WaterLane {
         let player_z = player_coord[2];
 
         if (this.game.overlap(this_z, this_z + 2, player_z + 1.5*Math.cos(this.game.dir), player_z + 1.5*Math.cos(this.game.dir)) &&
+            this.game.overlap(this_z, this_z + 2, player_z, player_z) &&
             (this.game.overlap(this_y, this_y, player_y-1.5, player_y))) {
             /*let is_on_obstacle = false;
             for (let i = 0; i < this.obstacles.length; i++) {
@@ -444,7 +441,8 @@ class LilyPad {
         let player_z = player_coord[2];
 
         if (this.game.overlap(this_x, this_x + 2, player_x, player_x + 2)
-            && this.game.overlap(this_z, this_z + 2, player_z, player_z + 2)) {
+            && this.game.overlap(this_z, this_z + 2, player_z, player_z + 2)
+            && !this.game.on_a_log) {
             this.collided = true;
             this.game.on_a_lilypad = true;
         } else {
@@ -514,7 +512,7 @@ class Log {
 
         if (this.game.overlap(this_x - 3, this_x + 6, player_x, player_x + 2)
             && this.game.overlap(this_z+0.5, this_z + 1.5, player_z, player_z + 2)
-            && !this.game.sinking) {
+            && !this.game.sinking && !this.game.on_a_lilypad) {
             this.collided = true;
             this.game.on_a_log = true;
             //Move player with log
