@@ -96,12 +96,37 @@ class GrassLane {
         this.game = game;
         this.lane_width = 2;
         this.lane_length = 70;
-
+        this.obstacles = [];
         this.z = start_z - i*this.lane_width;
         this.model_transform = Mat4.identity().times(Mat4.translation(0, -1.5, this.z));
-
+        this.addTrees();
         this.grass_color = hex_color("#5db025");
     }
+
+    addTrees() {
+        let num_trees = 1;
+        let tree_x = 4 * Math.floor(Math.random() * 3);
+        let tree_z = this.z + ((this.lane_width - 1.5)/2);
+
+        //One guaranteed lilypad
+        this.obstacles.push(new Tree(this.game, tree_x, tree_z));
+
+        //Random chance to generate up to 10 trees
+        for (let i = -40; i < 30; i += 4) {
+            if ((i < 0 || i > 8) && Math.random() < 0.25 && num_trees < 5) {
+                this.obstacles.push(new Tree(this.game, i, tree_z));
+                num_trees++;
+            }
+        }
+    }
+
+    render_trees(context, program_state, t) {
+        for (let i = 0; i < this.obstacles.length; i++) {
+            let tree = this.obstacles.at(i);
+            tree.render(context, program_state, t);
+        }
+    }
+
 
     scale() {
         this.scaled_model_transform = this.model_transform.times(Mat4.scale(this.lane_length, 0.01, this.lane_width));
@@ -110,6 +135,7 @@ class GrassLane {
     render(context, program_state, t) {
         this.scale();
         this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.grass);
+        this.render_trees(context, program_state, t);
     }
 }
 
@@ -137,6 +163,11 @@ class Grass {
         //console.log(lane.model_transform);
         lane.model_transform = lane.model_transform.times(Mat4.translation(0, 0, dz));
         lane.z += dz;
+
+        for (let j = 0; j < lane.obstacles.length; j++) {
+            let log = lane.obstacles.at(j);
+            log.shift_forward(dz);
+        }
 
         if (t >= tMax) {
             //this.tStart = -1;
@@ -354,6 +385,37 @@ class WaterLane {
     }
 }
 
+class Tree {
+    constructor(game, x, z) {
+        this.tree_length = 1;
+        this.model_transform = Mat4.identity().times(Mat4.translation(x, 2, z));
+        this.scale();
+        this.game = game;
+        this.rotation_y = Math.random() * Math.PI;
+    }
+
+    shift_forward(z) {
+        this.model_transform = this.model_transform.times(Mat4.translation(0, 0, z));
+    }
+
+    scale() {
+        this.scaled_model_transform = this.model_transform.times(Mat4.rotation(Math.PI * 2, 1, 0, 0)).times(Mat4.rotation(this.rotation_y, 0, 1, 0))
+            .times(Mat4.scale(this.tree_length, this.tree_length, 1));
+        this.scaled_model_transform_w1 = this.model_transform.times(Mat4.translation(0, 2, 0)).times(Mat4.scale(2, 2, 2)).times(Mat4.rotation(this.rotation_y, 0, 1, 0));
+    }
+
+    render(context, program_state, t) {
+        this.scale();
+
+        if (this.collided) {
+            this.game.shapes.trunk.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: hex_color("#fa0909")}));
+        } else {
+            this.game.shapes.trunk.draw(context, program_state, this.scaled_model_transform, this.game.materials.wood);
+            this.game.shapes.leaf.draw(context, program_state, this.scaled_model_transform_w1, this.game.materials.leaf);
+        }
+    }
+}
+
 class LilyPad {
     constructor(game, x, z) {
         this.lilypad_length = 1.5;
@@ -493,14 +555,15 @@ class Car {
             this.model_transform = Mat4.identity().times(Mat4.translation(40, 1, z));
             this.x = 40;
         }
-        this.model_transform_w1 = this.model_transform.times(Mat4.translation(-1.5, -1.5, 1));
-        this.model_transform_w2 = this.model_transform_w1.times(Mat4.translation(3, 0, 0));
+        this.model_transform_w1 = this.model_transform.times(Mat4.translation(-2.25, -1.5, 1));
+        this.model_transform_w2 = this.model_transform_w1.times(Mat4.translation(4.75, 0, 0));
         this.model_transform_w3 = this.model_transform_w1.times(Mat4.translation(0, 0, -2));
         this.model_transform_w4 = this.model_transform_w2.times(Mat4.translation(0, 0, -2));
         this.scale();
         this.dx = 0.1;
         this.game = game;
         this.collided = false;
+        this.isSedan = Math.floor(Math.random() * 2);
     }
 
     move(t) {
@@ -530,7 +593,8 @@ class Car {
     }
 
     scale() {
-        this.scaled_model_transform = this.model_transform.times(Mat4.scale(this.car_length, 1.5, 1));
+        this.scaled_model_transform = this.model_transform.times(Mat4.translation(0, -0.2, 0))
+            .times(Mat4.scale(2.5, 2.5, 2.5));//times(Mat4.scale(this.car_length, 1.5, 1));
         this.scaled_model_transform_w1 = this.model_transform_w1.times(Mat4.scale(1, 1, 0.5));
         this.scaled_model_transform_w2 = this.model_transform_w2.times(Mat4.scale(1, 1, 0.5));
         this.scaled_model_transform_w3 = this.model_transform_w3.times(Mat4.scale(1, 1, 0.5));
@@ -559,16 +623,49 @@ class Car {
 
     render(context, program_state, t) {
         const car_color = hex_color("#bd112b");
+        const truck_color = hex_color("#abd7eb");
         const collide_car_color = hex_color("#FFA500");
         const wheel_color = hex_color("#000000");
         if (!this.game.hit_by_car) this.move(t);
         this.scale();
         this.detect_collision_with_player();
+        let opposite_mt = this.scaled_model_transform.times(Mat4.translation(0.2, 0, 0))
+            .times(Mat4.rotation(Math.PI, 0, 1, 0));
         if (this.collided) {
             this.game.hit_by_car = true;
-            this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: collide_car_color}));
+            if (this.isSedan) {
+                if (this.direction == 1) {
+                    this.game.shapes.truck.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: collide_car_color}));
+                }
+                else {
+                     this.game.shapes.truck.draw(context, program_state, opposite_mt, this.game.materials.plastic.override({color: collide_car_color}));
+                }
+            }
+            else {
+                if (this.direction == 1) {
+                    this.game.shapes.truck.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: collide_car_color}));
+                }
+                else {
+                     this.game.shapes.truck.draw(context, program_state, opposite_mt, this.game.materials.plastic.override({color: collide_car_color}));
+                }
+            }
         } else {
-            this.game.shapes.cube.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: car_color}));
+            if (this.isSedan) {
+                if (this.direction == 1) {
+                    this.game.shapes.truck.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: car_color}));
+                }
+                else {
+                    this.game.shapes.truck.draw(context, program_state, opposite_mt, this.game.materials.plastic.override({color: car_color}));
+                }
+            }
+            else {
+                if (this.direction == 1) {
+                    this.game.shapes.truck.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: truck_color}));
+                }
+                else {
+                    this.game.shapes.truck.draw(context, program_state, opposite_mt, this.game.materials.plastic.override({color: truck_color}));
+                }
+            }
         }
         this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w1, this.game.materials.plastic.override({color: wheel_color}));
         this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w2, this.game.materials.plastic.override({color: wheel_color}));
@@ -733,6 +830,11 @@ class Base_Scene extends Scene {
         // At the beginning of our program, load one of each of these shape definitions onto the GPU.
         this.shapes = {
             'player': new Shape_From_File("assets/bear.obj"),//new Player(),
+            sedan: new Shape_From_File("assets/sedan_v7.obj"),
+            truck: new Shape_From_File("assets/truck_v.obj"),
+            wheel: new Shape_From_File("assets/wheel_v3.obj"),
+            trunk: new Shape_From_File("assets/trunk.obj"),
+            leaf: new Shape_From_File("assets/leaf.obj"),
             cube: new defs.Cube(),
             sphere: new defs.Subdivision_Sphere(4),
             sheet: new defs.Grid_Patch(10, 10, row_operation, column_operation),
