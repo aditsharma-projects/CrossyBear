@@ -170,7 +170,7 @@ class Water {
         this.lanes = [];
         //this.tStart = -1;
         this.lane_width = 2.5;
-
+        
         if (num_lanes == -1) {
             //Generate random number of lanes per water: min 1, max 8
             this.num_lanes = 1 + Math.floor(Math.random() * 7);
@@ -261,7 +261,7 @@ class WaterLane {
                     }
                 }
             } else {
-                let log_position = this.z - ((this.lane_width - 1)/2);
+                let log_position = this.z - ((this.lane_width)/2);
                 this.obstacles.push(new Log(this.game, log_position, this.direction));
             }
         }
