@@ -398,7 +398,7 @@ class Tree {
     scale() {
         this.scaled_model_transform = this.model_transform.times(Mat4.rotation(Math.PI * 2, 1, 0, 0)).times(Mat4.rotation(this.rotation_y, 0, 1, 0))
             .times(Mat4.scale(this.tree_length, this.tree_length, 1));
-        this.scaled_model_transform_w1 = this.model_transform.times(Mat4.translation(0, 2, 0)).times(Mat4.scale(2, 2, 2)).times(Mat4.rotation(this.rotation_y, 0, 1, 0));
+        this.scaled_model_transform_w1 = this.model_transform.times(Mat4.translation(0, 1, 0)).times(Mat4.scale(2, 2, 2)).times(Mat4.rotation(this.rotation_y, 0, 1, 0));
     }
 
     render(context, program_state, t) {
@@ -415,7 +415,7 @@ class Tree {
 
 class LilyPad {
     constructor(game, x, z) {
-        this.lilypad_length = 1.5;
+        this.lilypad_length = 1.25;
         this.model_transform = Mat4.identity().times(Mat4.translation(x, -1, z));
         this.scale();
         this.game = game;
@@ -491,6 +491,10 @@ class Log {
         }
     }
 
+    shift_downward(y) {
+        this.model_transform = this.model_transform.times(Mat4.translation(0, y, 0));
+    }
+
     shift_forward(z) {
         this.model_transform = this.model_transform.times(Mat4.translation(0, 0, z));
     }
@@ -522,7 +526,9 @@ class Log {
                 this.game.lateral_translation = this.game.lateral_translation.times(Mat4.translation(this.dx, 0, 0));
             }
         } else {
-            if (this.collided) this.game.on_a_log = false;
+            if (this.collided) {
+                this.game.on_a_log = false;
+            }
             this.collided = false;
         }
     }
@@ -544,17 +550,16 @@ class Log {
 
 class Car {
     constructor(game, z, direction) {
-        this.car_length = 3;
         this.direction = direction;
         if (this.direction == 1) {
-            this.model_transform = Mat4.identity().times(Mat4.translation(-40, 1, z));
+            this.model_transform = Mat4.identity().times(Mat4.translation(-40, 0, z));
             this.x = -40;
         } else {
-            this.model_transform = Mat4.identity().times(Mat4.translation(40, 1, z));
+            this.model_transform = Mat4.identity().times(Mat4.translation(40, 0, z));
             this.x = 40;
         }
-        this.model_transform_w1 = this.model_transform.times(Mat4.translation(-2.25, -1.5, 1));
-        this.model_transform_w2 = this.model_transform_w1.times(Mat4.translation(4.75, 0, 0));
+        this.model_transform_w1 = this.model_transform.times(Mat4.translation(-1.8, -0.75, 1));
+        this.model_transform_w2 = this.model_transform_w1.times(Mat4.translation(4, 0, 0));
         this.model_transform_w3 = this.model_transform_w1.times(Mat4.translation(0, 0, -2));
         this.model_transform_w4 = this.model_transform_w2.times(Mat4.translation(0, 0, -2));
         this.scale();
@@ -592,11 +597,12 @@ class Car {
 
     scale() {
         this.scaled_model_transform = this.model_transform.times(Mat4.translation(0, -0.2, 0))
-            .times(Mat4.scale(2.5, 2.5, 2.5));//times(Mat4.scale(this.car_length, 1.5, 1));
-        this.scaled_model_transform_w1 = this.model_transform_w1.times(Mat4.scale(1, 1, 0.5));
-        this.scaled_model_transform_w2 = this.model_transform_w2.times(Mat4.scale(1, 1, 0.5));
-        this.scaled_model_transform_w3 = this.model_transform_w3.times(Mat4.scale(1, 1, 0.5));
-        this.scaled_model_transform_w4 = this.model_transform_w4.times(Mat4.scale(1, 1, 0.5));
+            .times(Mat4.scale(2, 2, 2));
+        let size = 1/1.75;
+        this.scaled_model_transform_w1 = this.model_transform_w1.times(Mat4.scale(size, size, 0.3));
+        this.scaled_model_transform_w2 = this.model_transform_w2.times(Mat4.scale(size, size, 0.3));
+        this.scaled_model_transform_w3 = this.model_transform_w3.times(Mat4.scale(size, size, 0.3));
+        this.scaled_model_transform_w4 = this.model_transform_w4.times(Mat4.scale(size, size, 0.3));
     }
 
     detect_collision_with_player() {
@@ -689,14 +695,14 @@ class RoadLane {
             //and there is no car immediately in front of new car
             if (this.cars.length > 0) {
                 if (this.cars.length < 4) {
-                    let car_position = this.z - ((this.lane_width - 1)/2);
+                    let car_position = this.z + ((this.lane_width - 1)/2);
                     if ((this.direction == 1 && this.cars.at(this.cars.length-1).x > -20) ||
                         (this.direction == 0 && this.cars.at(this.cars.length-1).x < 20)) {
                         this.cars.push(new Car(this.game, car_position, this.direction));
                     }
                 }
             } else {
-                let car_position = this.z - ((this.lane_width - 1)/2);
+                let car_position = this.z + ((this.lane_width - 1)/2);
                 this.cars.push(new Car(this.game, car_position, this.direction));
             }
         }
