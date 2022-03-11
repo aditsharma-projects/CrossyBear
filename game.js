@@ -63,6 +63,7 @@ class RedSection {
     }
 
     jump_forward(lane, t, tMax, dt) {
+        if(this.game.tree_blocking) return;
         let dz = this.game.jump_length*dt*Math.cos(this.game.dir); if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
         lane.model_transform = lane.model_transform.times(Mat4.translation(0, 0, dz));
         lane.z += dz;
@@ -152,6 +153,7 @@ class Grass {
     jump_forward(lane, player_angle, t, tMax, dt) {
         //console.log("Player Angle: "+ player_angle.toString())
         //let dz = 0.05; // Try dz = dt;
+        if(this.game.tree_blocking) return;
         let dz = this.game.jump_length*dt*Math.cos(this.game.dir); if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
         
         
@@ -218,6 +220,7 @@ class Water {
     jump_forward(lane, player_angle, t, tMax, dt) {
         //console.log("Player Angle: "+ player_angle.toString())
         //let dz = 0.05; // Try dz = dt;
+        if(this.game.tree_blocking) return;
         let dz = this.game.jump_length*dt*Math.cos(this.game.dir); if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
 
         //if(lane.z > 0.95) lane.z > 1 ? dz = 0 : dz = 1-lane.z;
@@ -386,6 +389,7 @@ class Tree {
     constructor(game, x, z) {
         this.tree_length = 1;
         this.tree_height = (Math.random() * 2) + 1;
+        this.x = x;
         this.model_transform = Mat4.identity().times(Mat4.translation(x, 2, z));
         this.scale();
         this.game = game;
@@ -402,15 +406,33 @@ class Tree {
         this.scaled_model_transform_w1 = this.model_transform.times(Mat4.translation(0, 1 + this.tree_height, 0)).times(Mat4.scale(this.tree_height, this.tree_height, this.tree_height)).times(Mat4.rotation(this.rotation_y, 0, 1, 0));
     }
 
+    detect_collision_with_player() {
+        let this_coord = this.model_transform.transposed()[3].slice(0, 3);
+        let player_coord = this.game.player_coord.transposed()[3].slice(0, 3);
+
+        let this_x = this_coord[0];
+        let this_z = this_coord[2];
+
+        let player_x = player_coord[0];
+        let player_z = player_coord[2];
+        //console.log(this.game.dir)
+        let facing = (this.game.dir>0 && this.game.dir <= Math.PI && player_x > this_x) || (this.game.dir<0 && this.game.dir >= -Math.PI && player_x < this_x) ||
+        (this.game.dir==0 && player_x > this_x-0.5 && player_x < this_x+0.5);
+        if (this.game.overlap(this_x, this_x + 2, player_x, player_x + 2)
+            && this.game.overlap(this_z, this_z + 2, player_z, player_z + 2)) 
+        {   
+            //console.log("Player x: "+player_x.toString()+"   Tree x: "+this_x);
+            //console.log(facing)
+            if(this.game.jumping && facing) this.game.tree_blocking = true;
+            else this.game.tree_blocking = false;
+        }
+    }
+
     render(context, program_state, t) {
         this.scale();
-
-        if (this.collided) {
-            this.game.shapes.trunk.draw(context, program_state, this.scaled_model_transform, this.game.materials.plastic.override({color: hex_color("#fa0909")}));
-        } else {
-            this.game.shapes.trunk.draw(context, program_state, this.scaled_model_transform, this.game.materials.wood);
-            this.game.shapes.leaf.draw(context, program_state, this.scaled_model_transform_w1, this.game.materials.leaf);
-        }
+        this.detect_collision_with_player();
+        this.game.shapes.trunk.draw(context, program_state, this.scaled_model_transform, this.game.materials.wood);
+        this.game.shapes.leaf.draw(context, program_state, this.scaled_model_transform_w1, this.game.materials.leaf);
     }
 }
 
@@ -758,6 +780,7 @@ class Road {
     jump_forward(lane, player_angle, t, tMax, dt) {
         //console.log("Player Angle: "+ player_angle.toString())
         //let dz = 0.05; // Try dz = dt;
+        if(this.game.tree_blocking) return;
         let dz = this.game.jump_length*dt*Math.cos(this.game.dir); if(t==0) dz = 0; // Small edge case, don't want to add dz at the 0th second
         
         
@@ -933,6 +956,7 @@ export class Game extends Base_Scene {
         this.on_a_log = false;
         this.on_a_lilypad = false;
         this.player_dead = false;
+        this.tree_blocking = false
     }
 
     make_control_panel() {
@@ -947,14 +971,18 @@ export class Game extends Base_Scene {
         });
         this.key_triggered_button("Jump backwards", ["k"], () => {
             this.dir = (this.dir+Math.PI)%(2*Math.PI);
+            if(this.dir > Math.PI) this.dir = this.dir - 2*Math.PI;
+            if(this.dir < -Math.PI) this.dir = this.dir + 2*Math.PI;
             this.queuedMoves++;
 
         });
         this.key_triggered_button("Turn left", ["j"], () => {
             this.dir = (this.dir+(Math.PI/4)%(2*Math.PI));
+            if(this.dir > Math.PI) this.dir = this.dir - 2*Math.PI;
         });
         this.key_triggered_button("Turn right", ["l"], () => {
             this.dir = (this.dir-(Math.PI/4)%(2*Math.PI));
+            if(this.dir < -Math.PI) this.dir = this.dir + 2*Math.PI;
         });
         
     }
@@ -1051,6 +1079,13 @@ export class Game extends Base_Scene {
         //let y = -4*yMax*z*(z+1);
         let y = -4*yMax*z*(z+this.jump_length)/(this.jump_length**2);
         this.jumping = true;
+        if (this.tree_blocking){
+            if(t>=tMax){
+                y = 0; this.tStart = -1; this.queuedMoves--;this.jumping = false;
+                this.tree_blocking=false;
+            } 
+            return model_transform.times(Mat4.translation(0,y,0));
+        } 
         if(t>=tMax){
             y = 0; this.tStart = -1; this.queuedMoves--;
             // Shift camera view one unit forward
