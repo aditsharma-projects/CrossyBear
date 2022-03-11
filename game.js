@@ -622,7 +622,7 @@ class Car {
     scale() {
         this.scaled_model_transform = this.model_transform.times(Mat4.translation(0, -0.2, 0))
             .times(Mat4.scale(2, 2, 2));
-        let size = 1/1.75;
+        let size = 1/2;//1/1.75;
         this.scaled_model_transform_w1 = this.model_transform_w1.times(Mat4.scale(size, size, 0.3));
         this.scaled_model_transform_w2 = this.model_transform_w2.times(Mat4.scale(size, size, 0.3));
         this.scaled_model_transform_w3 = this.model_transform_w3.times(Mat4.scale(size, size, 0.3));
@@ -695,10 +695,10 @@ class Car {
                 }
             }
         }
-        this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w1, this.game.materials.plastic.override({color: wheel_color}));
-        this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w2, this.game.materials.plastic.override({color: wheel_color}));
-        this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w3, this.game.materials.plastic.override({color: wheel_color}));
-        this.game.shapes.sphere.draw(context, program_state, this.scaled_model_transform_w4, this.game.materials.plastic.override({color: wheel_color}));
+        this.game.shapes.wheel.draw(context, program_state, this.scaled_model_transform_w1, this.game.materials.plastic.override({color: wheel_color}));
+        this.game.shapes.wheel.draw(context, program_state, this.scaled_model_transform_w2, this.game.materials.plastic.override({color: wheel_color}));
+        this.game.shapes.wheel.draw(context, program_state, this.scaled_model_transform_w3, this.game.materials.plastic.override({color: wheel_color}));
+        this.game.shapes.wheel.draw(context, program_state, this.scaled_model_transform_w4, this.game.materials.plastic.override({color: wheel_color}));
     }
 }
 
@@ -859,9 +859,8 @@ class Base_Scene extends Scene {
         // At the beginning of our program, load one of each of these shape definitions onto the GPU.
         this.shapes = {
             'player': new Shape_From_File("assets/bear.obj"),//new Player(),
-            sedan: new Shape_From_File("assets/sedan_v7.obj"),
-            truck: new Shape_From_File("assets/truck_v.obj"),
-            wheel: new Shape_From_File("assets/wheel_v3.obj"),
+            truck: new Shape_From_File("assets/truck.obj"),
+            wheel: new Shape_From_File("assets/wheel.obj"),
             trunk: new Shape_From_File("assets/trunk.obj"),
             leaf: new Shape_From_File("assets/leaf.obj"),
             cube: new defs.Cube(),
