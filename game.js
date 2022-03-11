@@ -416,10 +416,10 @@ class Tree {
         let player_x = player_coord[0];
         let player_z = player_coord[2];
         //console.log(this.game.dir)
-        let facing = (this.game.dir>0 && this.game.dir <= Math.PI && player_x > this_x) || (this.game.dir<0 && this.game.dir >= -Math.PI && player_x < this_x) ||
+        let facing = (this.game.dir>0 && this.game.dir < Math.PI && player_x > this_x) || (this.game.dir<0 && this.game.dir > -Math.PI && player_x < this_x) ||
         (this.game.dir==0 && player_x > this_x-0.5 && player_x < this_x+0.5);
         if (this.game.overlap(this_x, this_x + 2, player_x, player_x + 2)
-            && this.game.overlap(this_z, this_z + 2, player_z, player_z + 2)) 
+            && this.game.overlap(this_z, this_z + 1, player_z, player_z + 1)) 
         {   
             //console.log("Player x: "+player_x.toString()+"   Tree x: "+this_x);
             //console.log(facing)
