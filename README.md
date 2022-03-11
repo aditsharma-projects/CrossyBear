@@ -4,7 +4,7 @@
 - Clone the repo:
 ```console
 git clone https://github.com/aditsharma-projects/CrossyBear.git
-cd kindling
+cd CrossyBear
 ```
 - Run the following command from inside the project directory:
 ```console
