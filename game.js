@@ -77,7 +77,7 @@ class RedSection {
     }
 
     render(context, program_state, t, dt) {
-        if (this.game.jumping) {
+        if (this.game.jumping && !this.game.tree_blocking) {
             for (let i = 0; i < this.lanes.length; i++) {
                 let lane = this.lanes.at(i);
                 this.jump_forward(lane, t - this.game.tStart, 1, dt);
@@ -174,7 +174,8 @@ class Grass {
     }
 
     render(context, program_state, t, dt) {
-        if (this.game.jumping) {
+        
+        if (this.game.jumping && !this.game.tree_blocking) {
             for (let i = 0; i < this.lanes.length; i++) {
                 let lane = this.lanes.at(i);
                 /*if (this.tStart == -1) {
@@ -242,7 +243,7 @@ class Water {
 
     render(context, program_state, t, dt) {
 
-        if (this.game.jumping) {
+        if (this.game.jumping && !this.game.tree_blocking) {
             for (let i = 0; i < this.lanes.length; i++) {
                 let lane = this.lanes.at(i);
                 /*if (this.tStart == -1) {
@@ -423,7 +424,7 @@ class Tree {
         {   
             //console.log("Player x: "+player_x.toString()+"   Tree x: "+this_x);
             //console.log(facing)
-            if(this.game.jumping && facing) this.game.tree_blocking = true;
+            if(facing) this.game.tree_blocking = true;
             else this.game.tree_blocking = false;
         }
     }
@@ -797,7 +798,7 @@ class Road {
 
     render(context, program_state, t, dt) {
 
-        if (this.game.jumping) {
+        if (this.game.jumping && !this.game.tree_blocking) {
             for (let i = 0; i < this.lanes.length; i++) {
                 let lane = this.lanes.at(i);
                 this.jump_forward(lane, this.game.dir, t - this.game.tStart, 1, dt);
