@@ -105,11 +105,7 @@ class GrassLane {
 
     addTrees() {
         let num_trees = 1;
-        let tree_x = 4 * Math.floor(Math.random() * 3);
         let tree_z = this.z + ((this.lane_width - 1.5)/2);
-
-        //One guaranteed lilypad
-        this.obstacles.push(new Tree(this.game, tree_x, tree_z));
 
         //Random chance to generate up to 10 trees
         for (let i = -40; i < 30; i += 4) {
@@ -210,7 +206,7 @@ class Water {
         }
         let log_or_lilypad = 0;
         for (let i = 0; i < this.num_lanes; i++) {
-            if (log_or_lilypad == 1) {
+            if (this.lanes.length > 0 && this.lanes.at(i-1).log_or_lilypad != 0) {
                 log_or_lilypad = 0;
             } else {
                 if (Math.random() < 0.1) log_or_lilypad = 1;
@@ -276,13 +272,13 @@ class WaterLane {
         this.obstacles = [];
         this.direction = Math.floor(Math.random() * 2); //0 - left, 1 - right
         this.log_or_lilypad = log_or_lilypad; //0 - log, 1 - lilypad
-        if (this.log_or_lilypad == 1) this.addLilypads();
+        if (this.log_or_lilypad > 0) this.addLilypads();
     }
 
     addLog() {
         if (Math.random() < 0.01) {
-            //Add new car if there are no more than 3 cars on the road lane
-            //and there is no car immediately in front of new car
+            //Add new log if there are no more than 3 cars on the road lane
+            //and there is no log immediately in front of new log
             if (this.obstacles.length > 0) {
                 if (this.obstacles.length < 4) {
                     let log_position = this.z + ((this.lane_width - 1)/2);
@@ -292,7 +288,7 @@ class WaterLane {
                     }
                 }
             } else {
-                let log_position = this.z - ((this.lane_width)/2);
+                let log_position = this.z + ((this.lane_width - 1)/2);
                 this.obstacles.push(new Log(this.game, log_position, this.direction));
             }
         }
@@ -347,6 +343,7 @@ class WaterLane {
         let player_z = player_coord[2];
 
         if (this.game.overlap(this_z, this_z + 2, player_z + 1.5*Math.cos(this.game.dir), player_z + 1.5*Math.cos(this.game.dir)) &&
+            this.game.overlap(this_z, this_z + 2, player_z, player_z) &&
             (this.game.overlap(this_y, this_y, player_y-1.5, player_y))) {
             /*let is_on_obstacle = false;
             for (let i = 0; i < this.obstacles.length; i++) {
@@ -419,7 +416,7 @@ class Tree {
 
 class LilyPad {
     constructor(game, x, z) {
-        this.lilypad_length = 1.5;
+        this.lilypad_length = 1.25;
         this.model_transform = Mat4.identity().times(Mat4.translation(x, -1, z));
         this.scale();
         this.game = game;
@@ -445,7 +442,8 @@ class LilyPad {
         let player_z = player_coord[2];
 
         if (this.game.overlap(this_x, this_x + 2, player_x, player_x + 2)
-            && this.game.overlap(this_z, this_z + 2, player_z, player_z + 2)) {
+            && this.game.overlap(this_z, this_z + 2, player_z, player_z + 2)
+            && !this.game.on_a_log) {
             this.collided = true;
             this.game.on_a_lilypad = true;
         } else {
@@ -494,6 +492,10 @@ class Log {
         }
     }
 
+    shift_downward(y) {
+        this.model_transform = this.model_transform.times(Mat4.translation(0, y, 0));
+    }
+
     shift_forward(z) {
         this.model_transform = this.model_transform.times(Mat4.translation(0, 0, z));
     }
@@ -515,7 +517,7 @@ class Log {
 
         if (this.game.overlap(this_x - 3, this_x + 6, player_x, player_x + 2)
             && this.game.overlap(this_z+0.5, this_z + 1.5, player_z, player_z + 2)
-            && !this.game.sinking) {
+            && !this.game.sinking && !this.game.on_a_lilypad) {
             this.collided = true;
             this.game.on_a_log = true;
             //Move player with log
@@ -525,7 +527,9 @@ class Log {
                 this.game.lateral_translation = this.game.lateral_translation.times(Mat4.translation(this.dx, 0, 0));
             }
         } else {
-            if (this.collided) this.game.on_a_log = false;
+            if (this.collided) {
+                this.game.on_a_log = false;
+            }
             this.collided = false;
         }
     }
@@ -547,17 +551,16 @@ class Log {
 
 class Car {
     constructor(game, z, direction) {
-        this.car_length = 3;
         this.direction = direction;
         if (this.direction == 1) {
-            this.model_transform = Mat4.identity().times(Mat4.translation(-40, 1, z));
+            this.model_transform = Mat4.identity().times(Mat4.translation(-40, 0, z));
             this.x = -40;
         } else {
-            this.model_transform = Mat4.identity().times(Mat4.translation(40, 1, z));
+            this.model_transform = Mat4.identity().times(Mat4.translation(40, 0, z));
             this.x = 40;
         }
-        this.model_transform_w1 = this.model_transform.times(Mat4.translation(-2.25, -1.5, 1));
-        this.model_transform_w2 = this.model_transform_w1.times(Mat4.translation(4.75, 0, 0));
+        this.model_transform_w1 = this.model_transform.times(Mat4.translation(-1.8, -0.75, 1));
+        this.model_transform_w2 = this.model_transform_w1.times(Mat4.translation(4, 0, 0));
         this.model_transform_w3 = this.model_transform_w1.times(Mat4.translation(0, 0, -2));
         this.model_transform_w4 = this.model_transform_w2.times(Mat4.translation(0, 0, -2));
         this.scale();
@@ -595,11 +598,12 @@ class Car {
 
     scale() {
         this.scaled_model_transform = this.model_transform.times(Mat4.translation(0, -0.2, 0))
-            .times(Mat4.scale(2.5, 2.5, 2.5));//times(Mat4.scale(this.car_length, 1.5, 1));
-        this.scaled_model_transform_w1 = this.model_transform_w1.times(Mat4.scale(1, 1, 0.5));
-        this.scaled_model_transform_w2 = this.model_transform_w2.times(Mat4.scale(1, 1, 0.5));
-        this.scaled_model_transform_w3 = this.model_transform_w3.times(Mat4.scale(1, 1, 0.5));
-        this.scaled_model_transform_w4 = this.model_transform_w4.times(Mat4.scale(1, 1, 0.5));
+            .times(Mat4.scale(2, 2, 2));
+        let size = 1/1.75;
+        this.scaled_model_transform_w1 = this.model_transform_w1.times(Mat4.scale(size, size, 0.3));
+        this.scaled_model_transform_w2 = this.model_transform_w2.times(Mat4.scale(size, size, 0.3));
+        this.scaled_model_transform_w3 = this.model_transform_w3.times(Mat4.scale(size, size, 0.3));
+        this.scaled_model_transform_w4 = this.model_transform_w4.times(Mat4.scale(size, size, 0.3));
     }
 
     detect_collision_with_player() {
@@ -692,14 +696,14 @@ class RoadLane {
             //and there is no car immediately in front of new car
             if (this.cars.length > 0) {
                 if (this.cars.length < 4) {
-                    let car_position = this.z - ((this.lane_width - 1)/2);
+                    let car_position = this.z + ((this.lane_width - 1)/2);
                     if ((this.direction == 1 && this.cars.at(this.cars.length-1).x > -20) ||
                         (this.direction == 0 && this.cars.at(this.cars.length-1).x < 20)) {
                         this.cars.push(new Car(this.game, car_position, this.direction));
                     }
                 }
             } else {
-                let car_position = this.z - ((this.lane_width - 1)/2);
+                let car_position = this.z + ((this.lane_width - 1)/2);
                 this.cars.push(new Car(this.game, car_position, this.direction));
             }
         }
@@ -842,6 +846,19 @@ class Base_Scene extends Scene {
             capped: new defs.Capped_Cylinder(1, 10, [[0, 2], [0, 1]]),
             text: new Text_Line(20)
         };
+
+        //Texture coordinates
+        this.shapes.cube.arrays.texture_coord.forEach(
+            (v, i, l) => {
+                v[0] = v[0] * 25;
+            }
+        )
+        this.shapes.sheet.arrays.texture_coord.forEach(
+            (v, i, l) => {
+                v[0] = v[0] * 10;
+            }
+        )
+
         // *** Materials
         this.materials = {
             plastic: new Material(new defs.Phong_Shader(),
